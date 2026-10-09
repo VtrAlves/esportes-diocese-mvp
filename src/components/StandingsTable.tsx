@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { GROUPS } from "@/lib/rules";
-import { activeTiebreak, computeOverall, computeStandings, CRITERION_LABEL, isGroupComplete, tiedBlocks } from "@/lib/standings";
+import { activeTiebreak, computeOverall, computeStandings, CRITERION_LABEL, isGroupComplete, tiedBlocks, type StandingRow } from "@/lib/standings";
 import { readLocal, writeLocal } from "@/lib/storage";
 import type { GroupCode, GroupTiebreak, Match, Team } from "@/lib/types";
 import { cx, GlassCard, Segmented } from "./ui";
@@ -11,6 +11,54 @@ interface TableProps {
   matches: Match[];
   tiebreaks?: GroupTiebreak[];
   highlightTeam?: string | null;
+}
+
+/** Legenda das colunas da tabela de grupo. */
+export const GROUP_LEGEND = "J = jogos · V = vitórias · E = empates · D = derrotas · SP = saldo de pontos · Pts = pontos feitos";
+
+/** Tabela de estatísticas do grupo (J, V, E, D, saldo, pontos). `rows` já na ordem a exibir. */
+export function GroupStatsTable({
+  rows,
+  highlightTeam,
+  highlightIds,
+}: {
+  rows: StandingRow[];
+  highlightTeam?: string | null;
+  highlightIds?: string[];
+}) {
+  const highlight = (id: string) => id === highlightTeam || !!highlightIds?.includes(id);
+  return (
+    <table className="tabular w-full text-[14px]">
+      <thead>
+        <tr className="text-[11px] uppercase tracking-wider text-muted">
+          <th className="w-8 py-2 pl-4 text-left font-semibold">#</th>
+          <th className="py-2 text-left font-semibold">Equipe</th>
+          <th className="w-7 text-center font-semibold">J</th>
+          <th className="w-7 text-center font-semibold">V</th>
+          <th className="w-7 text-center font-semibold">E</th>
+          <th className="w-7 text-center font-semibold">D</th>
+          <th className="w-9 text-center font-semibold">SP</th>
+          <th className="w-12 pr-4 text-right font-semibold">Pts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={r.team.id} className={cx("border-t border-[var(--separator)]", highlight(r.team.id) && "bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]")}>
+            <td className="py-2.5 pl-4">
+              <span className={cx("inline-flex size-6 items-center justify-center rounded-full text-[12px] font-bold", i < 2 ? "bg-accent text-white" : "text-muted")}>{i + 1}</span>
+            </td>
+            <td className="truncate py-2.5 pr-2 font-medium">{r.team.name}</td>
+            <td className="text-center text-muted">{r.played}</td>
+            <td className="text-center font-semibold">{r.wins}</td>
+            <td className="text-center text-muted">{r.draws}</td>
+            <td className="text-center text-muted">{r.losses}</td>
+            <td className={cx("text-center", r.diff > 0 ? "text-success" : r.diff < 0 ? "text-danger" : "text-muted")}>{r.diff > 0 ? `+${r.diff}` : r.diff}</td>
+            <td className="pr-4 text-right font-bold">{r.pointsFor}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 export function GroupTable({ group, teams, matches, tiebreaks = [], highlightTeam }: TableProps & { group: GroupCode }) {
@@ -24,36 +72,7 @@ export function GroupTable({ group, teams, matches, tiebreaks = [], highlightTea
         <h3 className="text-[20px] font-bold tracking-tight">Grupo {group}</h3>
         {complete && <span className="text-[12px] font-semibold text-success">Encerrado</span>}
       </div>
-      <table className="tabular w-full text-[14px]">
-        <thead>
-          <tr className="text-[11px] uppercase tracking-wider text-muted">
-            <th className="w-8 py-2 pl-4 text-left font-semibold">#</th>
-            <th className="py-2 text-left font-semibold">Equipe</th>
-            <th className="w-7 text-center font-semibold">J</th>
-            <th className="w-7 text-center font-semibold">V</th>
-            <th className="w-7 text-center font-semibold">E</th>
-            <th className="w-7 text-center font-semibold">D</th>
-            <th className="w-9 text-center font-semibold">SP</th>
-            <th className="w-12 pr-4 text-right font-semibold">Pts</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.team.id} className={cx("border-t border-[var(--separator)]", r.team.id === highlightTeam && "bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]")}>
-              <td className="py-2.5 pl-4">
-                <span className={cx("inline-flex size-6 items-center justify-center rounded-full text-[12px] font-bold", i < 2 ? "bg-accent text-white" : "text-muted")}>{i + 1}</span>
-              </td>
-              <td className="truncate py-2.5 pr-2 font-medium">{r.team.name}</td>
-              <td className="text-center text-muted">{r.played}</td>
-              <td className="text-center font-semibold">{r.wins}</td>
-              <td className="text-center text-muted">{r.draws}</td>
-              <td className="text-center text-muted">{r.losses}</td>
-              <td className={cx("text-center", r.diff > 0 ? "text-success" : r.diff < 0 ? "text-danger" : "text-muted")}>{r.diff > 0 ? `+${r.diff}` : r.diff}</td>
-              <td className="pr-4 text-right font-bold">{r.pointsFor}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <GroupStatsTable rows={rows} highlightTeam={highlightTeam} />
       {tb ? (
         <p className="mx-4 mb-1 mt-1 rounded-xl bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] px-3 py-2 text-[12px] font-medium">
           {tb.criterion === "sorteio" ? "Ordem definida manualmente pelo juiz" : `Desempate escolhido pelo juiz: ${CRITERION_LABEL[tb.criterion]}`}
@@ -61,7 +80,11 @@ export function GroupTable({ group, teams, matches, tiebreaks = [], highlightTea
       ) : (
         tied && <p className="px-4 pt-1 text-[12px] text-muted">Empate na classificação resolvido pelos critérios automáticos.</p>
       )}
-      <p className="px-4 pb-3 pt-1 text-[11px] text-muted">1º e 2º avançam às quartas · E = empates · SP = saldo de pontos</p>
+      <p className="px-4 pb-3 pt-1 text-[11px] text-muted">
+        1º e 2º avançam às quartas
+        <br />
+        {GROUP_LEGEND}
+      </p>
     </GlassCard>
   );
 }
@@ -168,7 +191,9 @@ export function OverallTable({ teams, matches, highlightTeam }: { teams: Team[];
         </table>
       </div>
       <p className="px-4 pb-3 pt-1 text-[11px] text-muted">
-        Todos os jogos encerrados (grupos e mata-mata) · E = empates · PP = pontos pró · PC = pontos contra · SP = saldo de pontos
+        Todos os jogos encerrados (grupos e mata-mata)
+        <br />J = jogos · V = vitórias · E = empates · D = derrotas · PP = pontos pró (feitos) · PC = pontos contra (sofridos) · SP = saldo
+        de pontos · % = aproveitamento
       </p>
     </GlassCard>
   );

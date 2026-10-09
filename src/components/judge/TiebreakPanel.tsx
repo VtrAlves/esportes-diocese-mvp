@@ -13,6 +13,7 @@ import {
   type StandingRow,
 } from "@/lib/standings";
 import type { GroupCode, GroupTiebreak, Match, Team, TiebreakCriterion } from "@/lib/types";
+import { GROUP_LEGEND, GroupStatsTable } from "../StandingsTable";
 import { Button, cx, GlassCard, Icons, Sheet } from "../ui";
 
 interface Props {
@@ -102,14 +103,14 @@ export function TiebreakPanel({ teams, matches, tiebreaks, onDone, onError, refr
               )}
             </div>
 
-            <p className="text-[13px]">
-              Ordem atual:{" "}
-              {effective.map((r, i) => (
-                <span key={r.team.id} className="mr-2 whitespace-nowrap">
-                  <b>{ordinal(i)}</b> {r.team.name}
-                </span>
-              ))}
-            </p>
+            <div className="-mx-1 overflow-hidden rounded-2xl border border-[var(--separator)]">
+              <GroupStatsTable rows={effective} highlightIds={blocks.flat().map((r) => r.team.id)} />
+              <p className="px-4 pb-2 pt-1 text-[11px] text-muted">
+                Ordem atual · empatados em destaque
+                <br />
+                {GROUP_LEGEND}
+              </p>
+            </div>
 
             {blocks.map((block) => (
               <div key={block.map((r) => r.team.id).join()} className="space-y-2">
@@ -194,10 +195,16 @@ export function TiebreakPanel({ teams, matches, tiebreaks, onDone, onError, refr
         {manual && (
           <div className="space-y-3">
             <p className="text-[14px] text-muted">{manual.hint ?? "Use ↑ ↓ para definir a ordem dos empatados."}</p>
+            <ManualPreview teams={teams} matches={matches} tiebreaks={tiebreaks} manual={manual} />
             {manual.order.map((r, i) => (
               <div key={r.team.id} className="glass flex items-center gap-3 rounded-2xl p-3">
                 <span className="tabular w-8 text-[17px] font-bold">{ordinal(i)}</span>
-                <span className="flex-1 truncate text-[16px] font-medium">{r.team.name}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[16px] font-medium">{r.team.name}</span>
+                  <span className="tabular block text-[12px] text-muted">
+                    {r.wins}V {r.draws}E {r.losses}D · SP {r.diff > 0 ? `+${r.diff}` : r.diff} · {r.pointsFor} pts
+                  </span>
+                </span>
                 <button aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)} className="press glass size-10 rounded-full p-2 disabled:opacity-30">
                   {Icons.up}
                 </button>
@@ -212,6 +219,28 @@ export function TiebreakPanel({ teams, matches, tiebreaks, onDone, onError, refr
           </div>
         )}
       </Sheet>
+    </div>
+  );
+}
+
+/** Tabela do grupo como ficará com a ordem que o juiz está montando. */
+function ManualPreview({
+  teams,
+  matches,
+  tiebreaks,
+  manual,
+}: Pick<Props, "teams" | "matches" | "tiebreaks"> & { manual: { group: GroupCode; block: StandingRow[]; order: StandingRow[] } }) {
+  const effective = computeStandings(teams, matches, manual.group, tiebreaks);
+  const ids = applyBlockOrder(effective, manual.block, manual.order.map((r) => r.team.id));
+  const rows = ids.map((id) => effective.find((r) => r.team.id === id)!);
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--separator)]">
+      <GroupStatsTable rows={rows} highlightIds={manual.block.map((r) => r.team.id)} />
+      <p className="px-4 pb-2 pt-1 text-[11px] text-muted">
+        Como o Grupo {manual.group} vai ficar · 1º e 2º avançam
+        <br />
+        {GROUP_LEGEND}
+      </p>
     </div>
   );
 }
