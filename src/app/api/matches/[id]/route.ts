@@ -65,6 +65,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (resultChanged) {
       if (next.home_score === next.away_score) throw new ActionError("Resultado empatado: não há vencedor.");
       patch.winner_id = next.home_score > next.away_score ? next.home_team_id : next.away_team_id;
+      if ("home_score" in patch || "away_score" in patch) patch.walkover = false;
     }
 
     const res = await db.from("matches").update(patch).eq("id", id).select("*").single();

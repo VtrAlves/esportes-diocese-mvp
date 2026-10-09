@@ -8,6 +8,7 @@ export type MatchAction =
   | { type: "pause" }
   | { type: "timeup" }
   | { type: "finish" }
+  | { type: "walkover"; side: "home" | "away" }
   | { type: "reopen" }
   | { type: "reset" };
 
@@ -20,6 +21,7 @@ export type MatchPatch = Partial<
     | "elapsed_seconds"
     | "timer_started_at"
     | "golden_point"
+    | "walkover"
     | "winner_id"
     | "finished_at"
   >
@@ -82,8 +84,24 @@ export function applyAction(m: Match, action: MatchAction, now: number): MatchPa
         ...(m.status === "live" ? stopTimer(m, now) : {}),
       };
     }
+    case "walkover": {
+      if (!m.home_team_id || !m.away_team_id) throw new ActionError("Defina os dois times antes de dar W.O.");
+      const home = action.side === "home";
+      return {
+        status: "finished",
+        home_score: home ? m.target_points : 0,
+        away_score: home ? 0 : m.target_points,
+        winner_id: home ? m.home_team_id : m.away_team_id,
+        finished_at: nowIso,
+        walkover: true,
+        golden_point: false,
+        ...(m.status === "live" ? stopTimer(m, now) : {}),
+      };
+    }
     case "reopen": {
       if (m.status !== "finished") return {};
+      // Reabrir um W.O. volta o jogo ao zero (o placar do W.O. não foi disputado).
+      if (m.walkover) return applyAction(m, { type: "reset" }, now);
       return { status: "paused", winner_id: null, finished_at: null };
     }
     case "reset": {
@@ -94,6 +112,7 @@ export function applyAction(m: Match, action: MatchAction, now: number): MatchPa
         elapsed_seconds: 0,
         timer_started_at: null,
         golden_point: false,
+        walkover: false,
         winner_id: null,
         finished_at: null,
       };

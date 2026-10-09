@@ -4,7 +4,7 @@ import { getAdminClient } from "@/lib/supabase/server";
 import { syncBracket } from "@/lib/sync";
 import type { Match } from "@/lib/types";
 
-const ACTIONS = new Set(["point", "start", "pause", "timeup", "finish", "reopen", "reset"]);
+const ACTIONS = new Set(["point", "start", "pause", "timeup", "finish", "walkover", "reopen", "reset"]);
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return judgeRoute(async () => {
@@ -14,6 +14,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (action.type === "point" && (!["home", "away"].includes(action.side) || ![1, -1].includes(action.delta))) {
       throw new ActionError("Ponto inválido");
     }
+    if (action.type === "walkover" && !["home", "away"].includes(action.side)) throw new ActionError("W.O. inválido");
 
     const db = getAdminClient();
     const { data: current, error } = await db.from("matches").select("*").eq("id", id).single();
@@ -28,7 +29,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     }
 
     const wasFinished = current.status === "finished";
-    const changedResult = action.type === "finish" || ((action.type === "reopen" || action.type === "reset") && wasFinished);
+    const changedResult = action.type === "finish" || action.type === "walkover" || ((action.type === "reopen" || action.type === "reset") && wasFinished);
     if (changedResult) await syncBracket(db);
     return { match };
   });

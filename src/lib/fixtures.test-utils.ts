@@ -24,6 +24,7 @@ export function match(p: Partial<Match> & { slot: string; phase?: Phase }): Matc
     elapsed_seconds: 0,
     timer_started_at: null,
     golden_point: false,
+    walkover: false,
     winner_id: null,
     finished_at: null,
     updated_at: "",

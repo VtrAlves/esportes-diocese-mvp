@@ -19,6 +19,7 @@ export async function POST(req: Request) {
         elapsed_seconds: 0,
         timer_started_at: null,
         golden_point: false,
+        walkover: false,
         winner_id: null,
         finished_at: null,
       })

@@ -27,6 +27,7 @@ create table if not exists public.matches (
   elapsed_seconds integer not null default 0,
   timer_started_at timestamptz,
   golden_point boolean not null default false,
+  walkover boolean not null default false,
   winner_id uuid references public.teams(id) on delete set null,
   finished_at timestamptz,
   updated_at timestamptz not null default now()

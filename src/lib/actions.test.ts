@@ -32,3 +32,24 @@ describe("applyAction", () => {
     expect(applyAction(base, { type: "point", side: "away", delta: -1 }, t0)).toMatchObject({ away_score: 0 });
   });
 });
+
+describe("W.O.", () => {
+  it("encerra com pontos da partida x 0 para o vencedor", () => {
+    expect(applyAction({ ...base, target_points: 12 }, { type: "walkover", side: "away" }, t0)).toMatchObject({
+      status: "finished",
+      home_score: 0,
+      away_score: 12,
+      winner_id: "a",
+      walkover: true,
+    });
+  });
+
+  it("exige os dois times", () => {
+    expect(() => applyAction({ ...base, away_team_id: null }, { type: "walkover", side: "home" }, t0)).toThrow(ActionError);
+  });
+
+  it("reabrir um W.O. zera a partida", () => {
+    const wo = { ...base, ...applyAction(base, { type: "walkover", side: "home" }, t0) };
+    expect(applyAction(wo, { type: "reopen" }, t0)).toMatchObject({ status: "scheduled", home_score: 0, walkover: false });
+  });
+});

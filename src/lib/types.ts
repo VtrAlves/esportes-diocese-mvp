@@ -27,6 +27,7 @@ export interface Match {
   elapsed_seconds: number;
   timer_started_at: string | null;
   golden_point: boolean;
+  walkover: boolean;
   winner_id: string | null;
   finished_at: string | null;
   updated_at: string;

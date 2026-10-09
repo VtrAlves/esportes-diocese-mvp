@@ -36,7 +36,7 @@ export function MatchRow({ match: m, teamName, highlightTeam, position, right, o
         <div className="mb-1 flex items-center gap-2">
           <span className="text-[12px] font-medium text-muted">{matchLabel(m)}</span>
           <span className="text-[11px] text-muted">· {m.target_points} pts · {Math.round(m.duration_seconds / 60)} min</span>
-          <span className="ml-auto"><StatusBadge status={m.status} golden={m.golden_point} /></span>
+          <span className="ml-auto"><StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} /></span>
         </div>
         {side(m.home_team_id, m.home_source, m.home_score)}
         {side(m.away_team_id, m.away_source, m.away_score)}

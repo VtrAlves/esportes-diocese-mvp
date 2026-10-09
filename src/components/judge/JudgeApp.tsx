@@ -121,6 +121,7 @@ export function JudgeApp() {
               setMatches={setMatches}
               onEdit={(m) => setEditingId(m.id)}
               onError={showError}
+              onDone={showInfo}
               refresh={refresh}
             />
           )}
@@ -138,6 +139,7 @@ export function JudgeApp() {
 
       <EditMatchSheet
         match={editing}
+        matches={matches}
         teams={teams}
         onClose={() => setEditingId(null)}
         onOpenScoreboard={openScoreboard}

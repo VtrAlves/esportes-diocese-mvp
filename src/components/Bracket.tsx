@@ -30,7 +30,7 @@ function BracketMatch({ m, title, teamName, highlightTeam, onSelect, featured }:
       <GlassCard className={cx("p-2", featured && "ring-2 ring-[color-mix(in_srgb,var(--gold)_60%,transparent)]")}>
         <div className="flex items-center justify-between px-2 pb-1 pt-1">
           <span className="text-[11px] font-bold uppercase tracking-wider text-muted">{title}</span>
-          <StatusBadge status={m.status} golden={m.golden_point} />
+          <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} />
         </div>
         {line(m.home_team_id, m.home_source, m.home_score)}
         {line(m.away_team_id, m.away_source, m.away_score)}

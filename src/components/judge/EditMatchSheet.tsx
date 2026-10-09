@@ -4,10 +4,12 @@ import { judgeApi } from "@/lib/judgeApi";
 import { defaultRules, GROUPS, matchLabel, sourceLabel } from "@/lib/rules";
 import { formatClock, remainingMs } from "@/lib/timer";
 import type { Match, Team } from "@/lib/types";
-import { Button, Field, inputClass, Sheet } from "../ui";
+import { startedDependents } from "@/lib/dependents";
+import { Button, ConfirmSheet, Field, inputClass, Sheet } from "../ui";
 
 interface Props {
   match: Match | null;
+  matches: Match[];
   teams: Team[];
   onClose: () => void;
   onOpenScoreboard: (m: Match) => void;
@@ -16,10 +18,11 @@ interface Props {
   refresh: () => void;
 }
 
-export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onDone, onError, refresh }: Props) {
+export function EditMatchSheet({ match: m, matches, teams, onClose, onOpenScoreboard, onDone, onError, refresh }: Props) {
   const [form, setForm] = useState({ target: "", minutes: "", home: "", away: "", hs: "", as: "", clock: "" });
   const [initialClock, setInitialClock] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<null | "redo" | "wo-home" | "wo-away">(null);
 
   useEffect(() => {
     if (!m) return;
@@ -38,6 +41,7 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
   }, [m?.id]);
 
   if (!m) return null;
+  const teamName = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "A definir";
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -157,6 +161,19 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
         <Button variant="primary" className="w-full" disabled={busy} onClick={save}>
           Salvar
         </Button>
+
+        {m.status !== "finished" && m.home_team_id && m.away_team_id && (
+          <div className="rounded-2xl border border-[var(--separator)] p-3">
+            <p className="mb-2 px-1 text-[13px] font-semibold text-muted">W.O. — vitória por ausência do adversário</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["home", "away"] as const).map((side) => (
+                <Button key={side} className="min-h-12 px-3 text-[14px]" disabled={busy} onClick={() => setConfirm(side === "home" ? "wo-home" : "wo-away")}>
+                  <span className="truncate">Vitória {teamName(side === "home" ? m.home_team_id : m.away_team_id)}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <Button onClick={() => { onOpenScoreboard(m); onClose(); }}>Abrir no placar</Button>
           {m.status === "finished" && (
@@ -165,20 +182,67 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
             </Button>
           )}
           {m.status !== "scheduled" && (
-            <Button
-              variant="danger"
-              disabled={busy}
-              onClick={() => {
-                if (window.confirm("Zerar placar e cronômetro desta partida?"))
-                  wrap(() => judgeApi.action(m.id, { type: "reset" }), "Partida zerada.");
-              }}
-            >
-              Zerar partida
+            <Button variant="danger" disabled={busy} onClick={() => setConfirm("redo")}>
+              {m.status === "finished" ? "Refazer jogo" : "Zerar partida"}
             </Button>
           )}
         </div>
       </div>
+      <ConfirmSheet
+        open={confirm === "wo-home" || confirm === "wo-away"}
+        title="Confirmar W.O."
+        confirmLabel="Confirmar W.O."
+        danger
+        busy={busy}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => {
+          const side = confirm === "wo-home" ? "home" : "away";
+          setConfirm(null);
+          wrap(() => judgeApi.action(m.id, { type: "walkover", side }), "W.O. registrado.");
+        }}
+      >
+        <p>
+          <b>{teamName(confirm === "wo-home" ? m.home_team_id : m.away_team_id)}</b> vence por W.O. contra{" "}
+          <b>{teamName(confirm === "wo-home" ? m.away_team_id : m.home_team_id)}</b>.
+        </p>
+        <p className="mt-2 text-muted">
+          A partida é encerrada com placar {m.target_points}×0 e conta na classificação e na chave.
+        </p>
+      </ConfirmSheet>
+      <ConfirmSheet
+        open={confirm === "redo"}
+        title={m.status === "finished" ? "Refazer jogo" : "Zerar partida"}
+        confirmLabel={m.status === "finished" ? "Refazer jogo" : "Zerar partida"}
+        danger
+        busy={busy}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => {
+          setConfirm(null);
+          wrap(() => judgeApi.action(m.id, { type: "reset" }), m.status === "finished" ? "Jogo voltou para a fila." : "Partida zerada.");
+        }}
+      >
+        <RedoWarning match={m} matches={matches} />
+      </ConfirmSheet>
     </Sheet>
+  );
+}
+
+export function RedoWarning({ match: m, matches }: { match: Match; matches: Match[] }) {
+  const deps = startedDependents(m, matches);
+  return (
+    <>
+      <p>
+        O placar e o cronômetro voltam para <b>0×0</b> e a partida fica como <b>não iniciada</b>
+        {m.status === "finished" ? ", de volta na fila de jogos" : ""}. Não dá para desfazer.
+      </p>
+      {m.status === "finished" && <p className="mt-2 text-muted">A classificação e a chave são recalculadas.</p>}
+      {deps.length > 0 && (
+        <p className="mt-2 rounded-xl bg-[color-mix(in_srgb,var(--gold)_18%,transparent)] p-3 text-[14px]">
+          Atenção: {deps.map((d) => matchLabel(d)).join(", ")} já {deps.length === 1 ? "começou" : "começaram"} com base neste resultado e não
+          {deps.length === 1 ? " será alterada" : " serão alteradas"} automaticamente.
+        </p>
+      )}
+    </>
   );
 }
 

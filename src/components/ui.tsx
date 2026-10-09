@@ -47,7 +47,9 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
   );
 }
 
-export function StatusBadge({ status, golden }: { status: string; golden?: boolean }) {
+export function StatusBadge({ status, golden, walkover }: { status: string; golden?: boolean; walkover?: boolean }) {
+  if (walkover && status === "finished")
+    return <span className="whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--danger)_18%,transparent)] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-danger">W.O.</span>;
   if (golden && status !== "finished")
     return <span className="rounded-full bg-gold px-2.5 py-0.5 whitespace-nowrap text-[11px] font-bold uppercase tracking-wide text-black">Ponto de ouro</span>;
   if (status === "live")
@@ -135,6 +137,41 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         {children}
       </div>
     </div>
+  );
+}
+
+/** Confirmação em folha inferior (substitui window.confirm). */
+export function ConfirmSheet({
+  open,
+  title,
+  children,
+  confirmLabel,
+  danger,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  danger?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet open={open} onClose={onClose} title={title}>
+      <div className="space-y-4">
+        <div className="text-[15px]">{children}</div>
+        <Button variant={danger ? "danger" : "primary"} className="min-h-12 w-full" disabled={busy} onClick={onConfirm}>
+          {busy ? "Aguarde…" : confirmLabel}
+        </Button>
+        <Button className="w-full" onClick={onClose}>
+          Cancelar
+        </Button>
+      </div>
+    </Sheet>
   );
 }
 

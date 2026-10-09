@@ -154,7 +154,7 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
             <span className={cx("tabular text-[44px] font-bold leading-tight sm:text-[56px]", remaining <= 60_000 && !finished && "text-danger")}>
               {formatClock(remaining)}
             </span>
-            <StatusBadge status={m.status} golden={m.golden_point} />
+            <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} />
           </div>
         </div>
         {!finished && (
