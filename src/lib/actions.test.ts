@@ -53,3 +53,25 @@ describe("W.O.", () => {
     expect(applyAction(wo, { type: "reopen" }, t0)).toMatchObject({ status: "scheduled", home_score: 0, walkover: false });
   });
 });
+
+describe("partida empatada", () => {
+  const tied = { ...base, home_score: 8, away_score: 8, status: "paused" as const };
+
+  it("encerra como empate na fase de grupos", () => {
+    expect(applyAction(tied, { type: "finish", outcome: "draw" }, t0)).toMatchObject({ status: "finished", winner_id: null });
+  });
+
+  it("não permite empate no mata-mata", () => {
+    expect(() => applyAction({ ...tied, phase: "qf" }, { type: "finish", outcome: "draw" }, t0)).toThrow(ActionError);
+  });
+
+  it("juiz define o vencedor mantendo o placar", () => {
+    const patch = applyAction({ ...tied, phase: "final" }, { type: "finish", outcome: "away" }, t0);
+    expect(patch).toMatchObject({ status: "finished", winner_id: "a" });
+    expect(patch).not.toHaveProperty("home_score");
+  });
+
+  it("com placar diferente, ignora a escolha e vence quem lidera", () => {
+    expect(applyAction({ ...base, home_score: 10, away_score: 4 }, { type: "finish", outcome: "away" }, t0)).toMatchObject({ winner_id: "h" });
+  });
+});

@@ -7,7 +7,8 @@ export type MatchAction =
   | { type: "start" }
   | { type: "pause" }
   | { type: "timeup" }
-  | { type: "finish" }
+  /** `outcome` só é usado com placar empatado: vencedor escolhido pelo juiz ou empate (só na fase de grupos). */
+  | { type: "finish"; outcome?: TieOutcome }
   | { type: "walkover"; side: "home" | "away" }
   | { type: "reopen" }
   | { type: "reset" };
@@ -27,7 +28,21 @@ export type MatchPatch = Partial<
   >
 >;
 
+export type TieOutcome = "home" | "away" | "draw";
+
 export class ActionError extends Error {}
+
+/** Vencedor de uma partida encerrada (null = empate). Valida as regras de empate. */
+export function resolveWinner(m: Pick<Match, "phase" | "home_score" | "away_score" | "home_team_id" | "away_team_id">, outcome?: TieOutcome): string | null {
+  if (m.home_score > m.away_score) return m.home_team_id;
+  if (m.away_score > m.home_score) return m.away_team_id;
+  if (!outcome) throw new ActionError("Placar empatado: escolha o vencedor ou encerre como empate.");
+  if (outcome === "draw") {
+    if (m.phase !== "group") throw new ActionError("No mata-mata não há empate: defina o vencedor.");
+    return null;
+  }
+  return outcome === "home" ? m.home_team_id : m.away_team_id;
+}
 
 function stopTimer(m: Match, now: number): MatchPatch {
   return {
@@ -74,11 +89,9 @@ export function applyAction(m: Match, action: MatchAction, now: number): MatchPa
     }
     case "finish": {
       if (m.status === "finished") return {};
-      if (m.home_score === m.away_score) throw new ActionError("Placar empatado: não há vencedor.");
-      const winner = m.home_score > m.away_score ? m.home_team_id : m.away_team_id;
       return {
         status: "finished",
-        winner_id: winner,
+        winner_id: resolveWinner(m, action.outcome),
         finished_at: nowIso,
         golden_point: false,
         ...(m.status === "live" ? stopTimer(m, now) : {}),

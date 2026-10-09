@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { applyAction, type MatchAction } from "@/lib/actions";
+import { applyAction, type MatchAction, type TieOutcome } from "@/lib/actions";
 import { judgeApi } from "@/lib/judgeApi";
 import { decidedWinnerSide, matchLabel, sourceLabel } from "@/lib/rules";
 import { formatClock, remainingMs } from "@/lib/timer";
@@ -27,6 +27,8 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
   const history = useRef<Side[]>([]);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [tieOpen, setTieOpen] = useState(false);
+  const [tieDismissed, setTieDismissed] = useState<string | null>(null);
 
   useEffect(() => {
     history.current = [];
@@ -98,10 +100,20 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
     prevWinner.current = winnerSide;
   }, [winnerSide]);
 
-  const confirmFinish = async () => {
+  const confirmFinish = async (outcome?: TieOutcome) => {
     setFinishing(true);
-    await run({ type: "finish" });
+    await run({ type: "finish", ...(outcome ? { outcome } : {}) });
     setFinishing(false);
+    setTieOpen(false);
+  };
+
+  // Empate: abre as opções sozinho quando o tempo acaba empatado (ponto de ouro).
+  const tied = m.home_score === m.away_score;
+  const tieKey = `${m.id}:${m.home_score}-${m.away_score}:${m.golden_point}`;
+  const showTie = m.status !== "finished" && tied && (tieOpen || (m.golden_point && tieDismissed !== tieKey));
+  const closeTie = () => {
+    setTieOpen(false);
+    setTieDismissed(tieKey);
   };
 
   const finished = m.status === "finished";
@@ -154,7 +166,7 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
             <span className={cx("tabular text-[44px] font-bold leading-tight sm:text-[56px]", remaining <= 60_000 && !finished && "text-danger")}>
               {formatClock(remaining)}
             </span>
-            <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} />
+            <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} draw={m.status === "finished" && !m.winner_id} />
           </div>
         </div>
         {!finished && (
@@ -208,8 +220,8 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
           <Button
             variant="primary"
             className="col-span-2"
-            disabled={m.home_score === m.away_score || finishing}
-            onClick={confirmFinish}
+            disabled={!canPlay || finishing}
+            onClick={() => (tied ? setTieOpen(true) : confirmFinish())}
           >
             Encerrar partida
           </Button>
@@ -231,11 +243,47 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
           <p className="tabular text-[40px] font-bold">
             <span className="text-home">{m.home_score}</span> <span className="text-muted">×</span> <span className="text-away">{m.away_score}</span>
           </p>
-          <Button variant="success" className="w-full min-h-14 text-[17px]" onClick={confirmFinish} disabled={finishing}>
+          <Button variant="success" className="w-full min-h-14 text-[17px]" onClick={() => confirmFinish()} disabled={finishing}>
             Confirmar resultado
           </Button>
           <Button className="w-full" onClick={() => setDismissed(decidedKey)}>
             Corrigir placar
+          </Button>
+        </div>
+      </Sheet>
+
+      <Sheet open={showTie} onClose={closeTie} title="Partida empatada">
+        <div className="space-y-3 text-center">
+          <p className="tabular text-[40px] font-bold">
+            <span className="text-home">{m.home_score}</span> <span className="text-muted">×</span> <span className="text-away">{m.away_score}</span>
+          </p>
+          <p className="text-[15px] text-muted">
+            {m.golden_point ? "Tempo esgotado com empate. " : ""}Como deseja encerrar?
+          </p>
+          {m.golden_point && (
+            <Button variant="success" className="min-h-14 w-full text-[16px]" onClick={closeTie}>
+              Continuar no ponto de ouro
+            </Button>
+          )}
+          {m.phase === "group" ? (
+            <Button variant="primary" className="min-h-14 w-full text-[16px]" disabled={finishing} onClick={() => confirmFinish("draw")}>
+              Encerrar como empate
+            </Button>
+          ) : (
+            <p className="rounded-xl bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] p-3 text-[13px]">
+              No mata-mata não há empate: escolha quem vence.
+            </p>
+          )}
+          <p className="pt-1 text-[13px] font-semibold text-muted">Ou defina o vencedor:</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["home", "away"] as const).map((side) => (
+              <Button key={side} className="min-h-14 px-3 text-[15px]" disabled={finishing} onClick={() => confirmFinish(side)}>
+                <span className="truncate">🏆 {teamName(side === "home" ? m.home_team_id : m.away_team_id)}</span>
+              </Button>
+            ))}
+          </div>
+          <Button variant="ghost" className="w-full" onClick={closeTie}>
+            Voltar ao placar
           </Button>
         </div>
       </Sheet>

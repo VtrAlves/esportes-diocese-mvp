@@ -1,4 +1,4 @@
-import { ActionError } from "@/lib/actions";
+import { ActionError, resolveWinner, type TieOutcome } from "@/lib/actions";
 import { judgeRoute } from "@/lib/api";
 import { getAdminClient } from "@/lib/supabase/server";
 import { syncBracket } from "@/lib/sync";
@@ -6,7 +6,7 @@ import type { Match } from "@/lib/types";
 
 type Editable = Partial<
   Pick<Match, "target_points" | "duration_seconds" | "home_team_id" | "away_team_id" | "home_score" | "away_score" | "teams_locked">
-> & { remaining_seconds?: number };
+> & { remaining_seconds?: number; outcome?: TieOutcome };
 
 const INT_FIELDS = ["target_points", "duration_seconds", "home_score", "away_score"] as const;
 
@@ -61,10 +61,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     // Corrigindo resultado de partida finalizada: recalcula o vencedor.
     const resultChanged =
-      m.status === "finished" && (teamsChanged || "home_score" in patch || "away_score" in patch);
+      m.status === "finished" && (teamsChanged || "home_score" in patch || "away_score" in patch || body.outcome !== undefined);
     if (resultChanged) {
-      if (next.home_score === next.away_score) throw new ActionError("Resultado empatado: não há vencedor.");
-      patch.winner_id = next.home_score > next.away_score ? next.home_team_id : next.away_team_id;
+      patch.winner_id = resolveWinner(next, body.outcome);
       if ("home_score" in patch || "away_score" in patch) patch.walkover = false;
     }
 

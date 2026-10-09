@@ -5,7 +5,7 @@ import { loadAll } from "./supabase/server";
 /** Recalcula o mata-mata e grava as vagas alteradas. Retorna os dados atualizados. */
 export async function syncBracket(db: SupabaseClient) {
   const data = await loadAll(db);
-  const updates = computeBracketUpdates(data.teams, data.matches);
+  const updates = computeBracketUpdates(data.teams, data.matches, data.tiebreaks);
   for (const u of updates) {
     const { error } = await db
       .from("matches")

@@ -1,6 +1,6 @@
 "use client";
 import type { MatchAction } from "./actions";
-import type { Match } from "./types";
+import type { GroupCode, Match, TiebreakCriterion } from "./types";
 
 let chain: Promise<unknown> = Promise.resolve();
 
@@ -29,10 +29,13 @@ async function call<T>(url: string, method: string, body?: unknown): Promise<T> 
 export const judgeApi = {
   action: (id: string, action: MatchAction) =>
     enqueue(() => call<{ match: Match }>(`/api/matches/${id}/action`, "POST", action)),
-  update: (id: string, patch: Partial<Match> & { remaining_seconds?: number }) =>
+  update: (id: string, patch: Partial<Match> & { remaining_seconds?: number; outcome?: "home" | "away" | "draw" }) =>
     enqueue(() => call<{ match: Match }>(`/api/matches/${id}`, "PATCH", patch)),
   reorder: (ids: string[]) => enqueue(() => call(`/api/matches/reorder`, "POST", { ids })),
   renameTeam: (id: string, name: string) => enqueue(() => call(`/api/teams/${id}`, "PATCH", { name })),
   resetTournament: (restoreDefaults: boolean) => enqueue(() => call(`/api/tournament/reset`, "POST", { restoreDefaults })),
+  setTiebreak: (group: GroupCode, order: string[], criterion: TiebreakCriterion) =>
+    enqueue(() => call(`/api/groups/${group}/tiebreak`, "POST", { order, criterion })),
+  clearTiebreak: (group: GroupCode) => enqueue(() => call(`/api/groups/${group}/tiebreak`, "DELETE")),
   logout: () => call(`/api/juiz/logout`, "POST"),
 };

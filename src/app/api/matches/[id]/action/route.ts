@@ -15,6 +15,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       throw new ActionError("Ponto inválido");
     }
     if (action.type === "walkover" && !["home", "away"].includes(action.side)) throw new ActionError("W.O. inválido");
+    if (action.type === "finish" && action.outcome !== undefined && !["home", "away", "draw"].includes(action.outcome)) {
+      throw new ActionError("Resultado inválido");
+    }
 
     const db = getAdminClient();
     const { data: current, error } = await db.from("matches").select("*").eq("id", id).single();

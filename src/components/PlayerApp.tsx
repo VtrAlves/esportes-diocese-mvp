@@ -22,7 +22,7 @@ const TABS: TabItem<Tab>[] = [
 ];
 
 export function PlayerApp() {
-  const { teams, matches, loading, error, connected } = useTournament();
+  const { teams, matches, tiebreaks, loading, error, connected } = useTournament();
   const teamName = useTeamName(teams);
   const [tab, setTab] = useState<Tab>("live");
   const [myTeam, setMyTeamState] = useState<string | null>(null);
@@ -150,11 +150,11 @@ export function PlayerApp() {
             </div>
           )}
 
-          {tab === "table" && <TablesView teams={teams} matches={matches} highlightTeam={myTeam} />}
+          {tab === "table" && <TablesView teams={teams} matches={matches} tiebreaks={tiebreaks} highlightTeam={myTeam} />}
 
           {tab === "bracket" && <Bracket matches={matches} teamName={teamName} highlightTeam={myTeam} />}
 
-          {tab === "team" && <MyTeam teams={teams} matches={matches} myTeam={myTeam} setMyTeam={setMyTeam} teamName={teamName} />}
+          {tab === "team" && <MyTeam teams={teams} matches={matches} tiebreaks={tiebreaks} myTeam={myTeam} setMyTeam={setMyTeam} teamName={teamName} />}
         </main>
       )}
 

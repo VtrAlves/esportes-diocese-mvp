@@ -16,15 +16,17 @@ Next.js 15 + Supabase (Postgres + Realtime). Visual "Liquid Glass", mobile-first
 | Final | 21 | 20 min |
 
 Editáveis por partida (Juiz → Jogos → tocar no jogo). Set único, ponto corrido. Fim do tempo: vence quem lidera; empate = ponto de ouro.
-Classificação: vitórias > saldo > pontos feitos > confronto direto. Quartas: 1A×2B, 1C×2D, 1B×2A, 1D×2C, preenchidas automaticamente quando cada grupo termina (o juiz pode trocar os times manualmente).
+Partida empatada: o juiz encerra como empate (só na fase de grupos) ou define o vencedor; com tempo esgotado também pode seguir no ponto de ouro.
+Classificação: vitórias > empates > saldo > pontos feitos > confronto direto. Em empate na classificação de um grupo encerrado, o juiz pode escolher o critério ou definir a ordem manualmente na aba Tabela. Quartas: 1A×2B, 1C×2D, 1B×2A, 1D×2C, preenchidas automaticamente quando cada grupo termina (o juiz pode trocar os times manualmente).
 
 ## Passo a passo
 
 ### 1. Supabase
 1. Crie um projeto em https://supabase.com.
 2. **SQL Editor** → cole e rode `supabase/migrations/0001_init.sql`.
-3. **SQL Editor** → cole e rode `supabase/seed.sql` (cria os 11 times e os 18 jogos; rodar de novo **zera** o campeonato).
-4. **Project Settings → API**: copie `Project URL`, `anon public` e `service_role` (secreta).
+3. **SQL Editor** → rode também `supabase/migrations/0002_walkover.sql` e `supabase/migrations/0003_group_tiebreaks.sql`.
+4. **SQL Editor** → cole e rode `supabase/seed.sql` (cria os 11 times e os 18 jogos; rodar de novo **zera** o campeonato).
+5. **Project Settings → API**: copie `Project URL`, `anon public` e `service_role` (secreta).
 
 ### 2. Vercel
 1. Suba este repositório no GitHub e importe na Vercel.

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Match, Team } from "../types";
+import type { GroupTiebreak, Match, Team } from "../types";
 
 /** Cliente com service role — usar apenas em rotas de servidor. */
 export function getAdminClient(): SupabaseClient {
@@ -9,12 +9,14 @@ export function getAdminClient(): SupabaseClient {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-export async function loadAll(db: SupabaseClient): Promise<{ teams: Team[]; matches: Match[] }> {
-  const [t, m] = await Promise.all([
+export async function loadAll(db: SupabaseClient): Promise<{ teams: Team[]; matches: Match[]; tiebreaks: GroupTiebreak[] }> {
+  const [t, m, tb] = await Promise.all([
     db.from("teams").select("*").order("name"),
     db.from("matches").select("*").order("order_index"),
+    db.from("group_tiebreaks").select("*"),
   ]);
   if (t.error) throw t.error;
   if (m.error) throw m.error;
-  return { teams: t.data as Team[], matches: m.data as Match[] };
+  // Tolerante: se a migração 0003 ainda não rodou, segue sem desempates manuais.
+  return { teams: t.data as Team[], matches: m.data as Match[], tiebreaks: tb.error ? [] : (tb.data as GroupTiebreak[]) };
 }

@@ -47,7 +47,9 @@ export function SectionTitle({ children, action }: { children: ReactNode; action
   );
 }
 
-export function StatusBadge({ status, golden, walkover }: { status: string; golden?: boolean; walkover?: boolean }) {
+export function StatusBadge({ status, golden, walkover, draw }: { status: string; golden?: boolean; walkover?: boolean; draw?: boolean }) {
+  if (draw && status === "finished")
+    return <span className="whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-accent">Empate</span>;
   if (walkover && status === "finished")
     return <span className="whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--danger)_18%,transparent)] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-danger">W.O.</span>;
   if (golden && status !== "finished")

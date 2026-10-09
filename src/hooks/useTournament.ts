@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
-import type { Match, Team } from "@/lib/types";
+import type { GroupTiebreak, Match, Team } from "@/lib/types";
 
 type Row = { id: string };
 
@@ -17,6 +17,7 @@ function upsert<T extends Row>(list: T[], row: T): T[] {
 export function useTournament() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [tiebreaks, setTiebreaks] = useState<GroupTiebreak[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -27,9 +28,10 @@ export function useTournament() {
 
   const refresh = useCallback(async () => {
     const db = getBrowserClient();
-    const [t, m] = await Promise.all([
+    const [t, m, tb] = await Promise.all([
       db.from("teams").select("*").order("name"),
       db.from("matches").select("*").order("order_index"),
+      db.from("group_tiebreaks").select("*"),
     ]);
     if (!mounted.current) return;
     if (t.error || m.error) {
@@ -38,6 +40,8 @@ export function useTournament() {
       setTeams(t.data as Team[]);
       const fresh = m.data as Match[];
       setMatches((prev) => fresh.map((x) => (isPending(x.id) ? prev.find((p) => p.id === x.id) ?? x : x)));
+      // Tolerante: sem a migração 0003, apenas não há desempates manuais.
+      setTiebreaks(tb.error ? [] : (tb.data as GroupTiebreak[]));
       setError(null);
     }
     setLoading(false);
@@ -56,6 +60,16 @@ export function useTournament() {
       .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, (p) => {
         if (p.eventType === "DELETE") setTeams((l) => l.filter((x) => x.id !== (p.old as Row).id));
         else setTeams((l) => upsert(l, p.new as Team));
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_tiebreaks" }, (p) => {
+        const code = ((p.new as GroupTiebreak)?.group_code ?? (p.old as GroupTiebreak)?.group_code) as string | undefined;
+        if (p.eventType === "DELETE") {
+          // O DELETE só traz a chave primária quando a tabela não usa "replica identity full".
+          if (code) setTiebreaks((l) => l.filter((x) => x.group_code !== code));
+          else refresh();
+        } else {
+          setTiebreaks((l) => [...l.filter((x) => x.group_code !== code), p.new as GroupTiebreak]);
+        }
       })
       .subscribe((status) => {
         setConnected(status === "SUBSCRIBED");
@@ -110,5 +124,5 @@ export function useTournament() {
     [refresh],
   );
 
-  return { teams, matches, loading, error, connected, refresh, mutateMatch, setMatches };
+  return { teams, matches, tiebreaks, loading, error, connected, refresh, mutateMatch, setMatches };
 }

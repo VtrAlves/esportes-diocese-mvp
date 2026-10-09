@@ -32,6 +32,9 @@ export async function POST(req: Request) {
       .in("phase", KNOCKOUT);
     if (bracket.error) throw bracket.error;
 
+    // Desempates manuais deixam de fazer sentido (a tabela pode não existir antes da migração 0003).
+    await db.from("group_tiebreaks").delete().not("group_code", "is", null);
+
     if (restoreDefaults) {
       const { matches } = await loadAll(db);
       const results = await Promise.all(

@@ -12,6 +12,7 @@ import { EditMatchSheet } from "./EditMatchSheet";
 import { JudgeQueue } from "./JudgeQueue";
 import { ScoreControl } from "./ScoreControl";
 import { TeamsEditor } from "./TeamsEditor";
+import { groupsWithTies, TiebreakPanel } from "./TiebreakPanel";
 import { useWakeLock } from "./useWakeLock";
 
 type Tab = "score" | "queue" | "bracket" | "teams";
@@ -24,7 +25,7 @@ const TABS: TabItem<Tab>[] = [
 ];
 
 export function JudgeApp() {
-  const { teams, matches, loading, error, connected, refresh, mutateMatch, setMatches } = useTournament();
+  const { teams, matches, tiebreaks, loading, error, connected, refresh, mutateMatch, setMatches } = useTournament();
   const teamName = useTeamName(teams);
   const [tab, setTab] = useState<Tab>("score");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,6 +64,7 @@ export function JudgeApp() {
   };
 
   const next = upcomingMatches(matches).find((m) => m.id !== scoreMatch?.id);
+  const pendingTies = groupsWithTies(teams, matches, tiebreaks).filter((t) => !t.decided);
 
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-3 pb-32 sm:px-4">
@@ -86,6 +88,14 @@ export function JudgeApp() {
         <div className="glass h-[60dvh] animate-pulse rounded-[32px]" />
       ) : (
         <main key={tab} className="enter">
+          {tab !== "bracket" && pendingTies.length > 0 && (
+            <button
+              onClick={() => setTab("bracket")}
+              className="press mb-3 w-full rounded-[22px] bg-gold px-4 py-3 text-left text-[15px] font-semibold text-black"
+            >
+              ⚖️ Empate no {pendingTies.map((t) => `Grupo ${t.group}`).join(", ")} — toque para escolher o desempate →
+            </button>
+          )}
           {tab === "score" &&
             (scoreMatch ? (
               <div className="space-y-3">
@@ -128,8 +138,9 @@ export function JudgeApp() {
 
           {tab === "bracket" && (
             <div className="space-y-6">
+              <TiebreakPanel teams={teams} matches={matches} tiebreaks={tiebreaks} onDone={showInfo} onError={showError} refresh={refresh} />
               <Bracket matches={matches} teamName={teamName} onSelect={(m) => setEditingId(m.id)} />
-              <TablesView teams={teams} matches={matches} />
+              <TablesView teams={teams} matches={matches} tiebreaks={tiebreaks} />
             </div>
           )}
 

@@ -25,7 +25,7 @@ export function LiveScoreboard({ match: m, teamName }: { match: Match; teamName:
     <GlassCard strong className="enter p-5 sm:p-8">
       <div className="mb-4 flex items-center justify-between">
         <span className="text-[13px] font-semibold text-muted">{matchLabel(m)}</span>
-        <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} />
+        <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} draw={m.status === "finished" && !m.winner_id} />
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
         <div className="min-w-0">

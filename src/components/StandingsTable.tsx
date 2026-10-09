@@ -1,14 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 import { GROUPS } from "@/lib/rules";
-import { computeOverall, computeStandings, isGroupComplete } from "@/lib/standings";
+import { activeTiebreak, computeOverall, computeStandings, CRITERION_LABEL, isGroupComplete, tiedBlocks } from "@/lib/standings";
 import { readLocal, writeLocal } from "@/lib/storage";
-import type { GroupCode, Match, Team } from "@/lib/types";
+import type { GroupCode, GroupTiebreak, Match, Team } from "@/lib/types";
 import { cx, GlassCard, Segmented } from "./ui";
 
-export function GroupTable({ group, teams, matches, highlightTeam }: { group: GroupCode; teams: Team[]; matches: Match[]; highlightTeam?: string | null }) {
-  const rows = computeStandings(teams, matches, group);
+interface TableProps {
+  teams: Team[];
+  matches: Match[];
+  tiebreaks?: GroupTiebreak[];
+  highlightTeam?: string | null;
+}
+
+export function GroupTable({ group, teams, matches, tiebreaks = [], highlightTeam }: TableProps & { group: GroupCode }) {
+  const rows = computeStandings(teams, matches, group, tiebreaks);
   const complete = isGroupComplete(matches, group);
+  const tb = activeTiebreak(matches, group, tiebreaks);
+  const tied = complete && tiedBlocks(computeStandings(teams, matches, group)).length > 0;
   return (
     <GlassCard className="overflow-hidden">
       <div className="flex items-center justify-between px-4 pb-1 pt-4">
@@ -22,6 +31,7 @@ export function GroupTable({ group, teams, matches, highlightTeam }: { group: Gr
             <th className="py-2 text-left font-semibold">Equipe</th>
             <th className="w-7 text-center font-semibold">J</th>
             <th className="w-7 text-center font-semibold">V</th>
+            <th className="w-7 text-center font-semibold">E</th>
             <th className="w-7 text-center font-semibold">D</th>
             <th className="w-9 text-center font-semibold">SP</th>
             <th className="w-12 pr-4 text-right font-semibold">Pts</th>
@@ -36,6 +46,7 @@ export function GroupTable({ group, teams, matches, highlightTeam }: { group: Gr
               <td className="truncate py-2.5 pr-2 font-medium">{r.team.name}</td>
               <td className="text-center text-muted">{r.played}</td>
               <td className="text-center font-semibold">{r.wins}</td>
+              <td className="text-center text-muted">{r.draws}</td>
               <td className="text-center text-muted">{r.losses}</td>
               <td className={cx("text-center", r.diff > 0 ? "text-success" : r.diff < 0 ? "text-danger" : "text-muted")}>{r.diff > 0 ? `+${r.diff}` : r.diff}</td>
               <td className="pr-4 text-right font-bold">{r.pointsFor}</td>
@@ -43,22 +54,29 @@ export function GroupTable({ group, teams, matches, highlightTeam }: { group: Gr
           ))}
         </tbody>
       </table>
-      <p className="px-4 pb-3 pt-1 text-[11px] text-muted">1º e 2º avançam às quartas · SP = saldo de pontos</p>
+      {tb ? (
+        <p className="mx-4 mb-1 mt-1 rounded-xl bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] px-3 py-2 text-[12px] font-medium">
+          {tb.criterion === "sorteio" ? "Ordem definida manualmente pelo juiz" : `Desempate escolhido pelo juiz: ${CRITERION_LABEL[tb.criterion]}`}
+        </p>
+      ) : (
+        tied && <p className="px-4 pt-1 text-[12px] text-muted">Empate na classificação resolvido pelos critérios automáticos.</p>
+      )}
+      <p className="px-4 pb-3 pt-1 text-[11px] text-muted">1º e 2º avançam às quartas · E = empates · SP = saldo de pontos</p>
     </GlassCard>
   );
 }
 
-export function StandingsGrid({ teams, matches, highlightTeam }: { teams: Team[]; matches: Match[]; highlightTeam?: string | null }) {
+export function StandingsGrid({ teams, matches, tiebreaks, highlightTeam }: TableProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {GROUPS.map((g) => (
-        <GroupTable key={g} group={g} teams={teams} matches={matches} highlightTeam={highlightTeam} />
+        <GroupTable key={g} group={g} teams={teams} matches={matches} tiebreaks={tiebreaks} highlightTeam={highlightTeam} />
       ))}
     </div>
   );
 }
 
-export function StandingsSummary({ teams, matches }: { teams: Team[]; matches: Match[] }) {
+export function StandingsSummary({ teams, matches, tiebreaks }: TableProps) {
   return (
     <GlassCard className="overflow-hidden">
       <h3 className="px-4 pb-1 pt-4 text-[17px] font-bold">Resumo da classificação</h3>
@@ -73,7 +91,7 @@ export function StandingsSummary({ teams, matches }: { teams: Team[]; matches: M
         </thead>
         <tbody>
           {GROUPS.map((g) => {
-            const rows = computeStandings(teams, matches, g);
+            const rows = computeStandings(teams, matches, g, tiebreaks);
             const done = isGroupComplete(matches, g);
             return (
               <tr key={g} className="border-t border-[var(--separator)]">
@@ -106,13 +124,14 @@ export function OverallTable({ teams, matches, highlightTeam }: { teams: Team[];
         <span className="text-[12px] text-muted">{played} {played === 1 ? "jogo encerrado" : "jogos encerrados"}</span>
       </div>
       <div className="overflow-x-auto">
-        <table className="tabular w-full min-w-[340px] text-[13.5px]">
+        <table className="tabular w-full min-w-[360px] text-[13.5px]">
           <thead>
             <tr className="text-[11px] uppercase tracking-wider text-muted">
               <th className="w-8 py-2 pl-4 text-left font-semibold">#</th>
               <th className="py-2 text-left font-semibold">Equipe</th>
               <th className="w-7 text-center font-semibold">J</th>
               <th className="w-7 text-center font-semibold">V</th>
+              <th className="w-7 text-center font-semibold">E</th>
               <th className="w-7 text-center font-semibold">D</th>
               <th className="w-9 text-center font-semibold">PP</th>
               <th className="w-9 text-center font-semibold">PC</th>
@@ -137,6 +156,7 @@ export function OverallTable({ teams, matches, highlightTeam }: { teams: Team[];
                 </td>
                 <td className="text-center text-muted">{r.played}</td>
                 <td className="text-center font-semibold">{r.wins}</td>
+                <td className="text-center text-muted">{r.draws}</td>
                 <td className="text-center text-muted">{r.losses}</td>
                 <td className="text-center">{r.pointsFor}</td>
                 <td className="text-center text-muted">{r.pointsAgainst}</td>
@@ -148,7 +168,7 @@ export function OverallTable({ teams, matches, highlightTeam }: { teams: Team[];
         </table>
       </div>
       <p className="px-4 pb-3 pt-1 text-[11px] text-muted">
-        Todos os jogos encerrados (grupos e mata-mata) · PP = pontos pró · PC = pontos contra · SP = saldo de pontos
+        Todos os jogos encerrados (grupos e mata-mata) · E = empates · PP = pontos pró · PC = pontos contra · SP = saldo de pontos
       </p>
     </GlassCard>
   );
@@ -157,7 +177,7 @@ export function OverallTable({ teams, matches, highlightTeam }: { teams: Team[];
 type TableView = "groups" | "overall";
 
 /** Aba Tabela: grupos ou placar geral. */
-export function TablesView({ teams, matches, highlightTeam }: { teams: Team[]; matches: Match[]; highlightTeam?: string | null }) {
+export function TablesView({ teams, matches, tiebreaks, highlightTeam }: TableProps) {
   const [view, setView] = useState<TableView>("groups");
   useEffect(() => {
     if (readLocal("tabela") === "overall") setView("overall");
@@ -180,8 +200,8 @@ export function TablesView({ teams, matches, highlightTeam }: { teams: Team[]; m
       </div>
       {view === "groups" ? (
         <>
-          <StandingsGrid teams={teams} matches={matches} highlightTeam={highlightTeam} />
-          <StandingsSummary teams={teams} matches={matches} />
+          <StandingsGrid teams={teams} matches={matches} tiebreaks={tiebreaks} highlightTeam={highlightTeam} />
+          <StandingsSummary teams={teams} matches={matches} tiebreaks={tiebreaks} />
         </>
       ) : (
         <OverallTable teams={teams} matches={matches} highlightTeam={highlightTeam} />

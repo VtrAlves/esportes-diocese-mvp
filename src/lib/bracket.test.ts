@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeBracketUpdates, resolveSource } from "./bracket";
+import { groupResultsKey } from "./standings";
 import { match, result, team } from "./fixtures.test-utils";
 
 const teams = [team("a1", "A"), team("a2", "A"), team("a3", "A"), team("d1", "D"), team("d2", "D")];
@@ -36,5 +37,14 @@ describe("computeBracketUpdates", () => {
     expect(computeBracketUpdates(teams, [...reopened, { ...qf1, home_team_id: "a1" }])).toEqual([
       { id: "qf1", home_team_id: null, away_team_id: null },
     ]);
+  });
+});
+
+describe("chave com desempate do juiz", () => {
+  it("usa a ordem definida pelo juiz para 1º e 2º", () => {
+    const cycle = [result("A1", "A", "a1", "a2", 10, 9), result("A2", "A", "a2", "a3", 10, 4), result("A3", "A", "a3", "a1", 10, 6)];
+    const tb = { group_code: "A" as const, manual_order: ["a3", "a1", "a2"], criterion: "sorteio" as const, results_key: groupResultsKey(cycle, "A") };
+    expect(resolveSource("1A", teams, cycle, [tb])).toBe("a3");
+    expect(resolveSource("2A", teams, cycle, [tb])).toBe("a1");
   });
 });

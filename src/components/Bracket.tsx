@@ -17,7 +17,7 @@ function BracketMatch({ m, title, teamName, highlightTeam, onSelect, featured }:
     const won = done && m.winner_id === id;
     return (
       <div className={cx("flex items-center justify-between gap-2 rounded-xl px-3 py-2", won && "bg-[color-mix(in_srgb,var(--success)_14%,transparent)]")}>
-        <span className={cx("truncate text-[14px]", id ? "font-semibold" : "text-muted", id && id === highlightTeam && "text-accent", done && !won && "text-muted")}>
+        <span className={cx("truncate text-[14px]", id ? "font-semibold" : "text-muted", id && id === highlightTeam && "text-accent", done && m.winner_id && !won && "text-muted")}>
           {teamName(id, sourceLabel(src))}
         </span>
         {m.status !== "scheduled" && <span className="tabular text-[15px] font-bold">{score}</span>}
@@ -30,7 +30,7 @@ function BracketMatch({ m, title, teamName, highlightTeam, onSelect, featured }:
       <GlassCard className={cx("p-2", featured && "ring-2 ring-[color-mix(in_srgb,var(--gold)_60%,transparent)]")}>
         <div className="flex items-center justify-between px-2 pb-1 pt-1">
           <span className="text-[11px] font-bold uppercase tracking-wider text-muted">{title}</span>
-          <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} />
+          <StatusBadge status={m.status} golden={m.golden_point} walkover={m.walkover} draw={m.status === "finished" && !m.winner_id} />
         </div>
         {line(m.home_team_id, m.home_source, m.home_score)}
         {line(m.away_team_id, m.away_source, m.away_score)}

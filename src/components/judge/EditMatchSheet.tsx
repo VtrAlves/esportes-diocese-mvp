@@ -23,6 +23,7 @@ export function EditMatchSheet({ match: m, matches, teams, onClose, onOpenScoreb
   const [initialClock, setInitialClock] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<null | "redo" | "wo-home" | "wo-away">(null);
+  const [outcome, setOutcome] = useState<"home" | "away" | "draw">("draw");
 
   useEffect(() => {
     if (!m) return;
@@ -36,6 +37,7 @@ export function EditMatchSheet({ match: m, matches, teams, onClose, onOpenScoreb
       clock: formatClock(remainingMs(m, Date.now())),
     });
     setInitialClock(formatClock(remainingMs(m, Date.now())));
+    setOutcome(!m.winner_id ? (m.phase === "group" ? "draw" : "home") : m.winner_id === m.home_team_id ? "home" : "away");
     // Só reinicia o formulário ao abrir outra partida (não a cada atualização em tempo real).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m?.id]);
@@ -74,7 +76,11 @@ export function EditMatchSheet({ match: m, matches, teams, onClose, onOpenScoreb
       if (secs === null) return onError("Tempo restante inválido. Use o formato mm:ss, ex.: 05:30.");
       remaining = secs;
     }
-    wrap(() => judgeApi.update(m.id, { ...patch, ...(remaining !== undefined ? { remaining_seconds: remaining } : {}) }), "Partida atualizada.");
+    const tieOutcome = m.status === "finished" && patch.home_score === patch.away_score ? { outcome } : {};
+    wrap(
+      () => judgeApi.update(m.id, { ...patch, ...tieOutcome, ...(remaining !== undefined ? { remaining_seconds: remaining } : {}) }),
+      "Partida atualizada.",
+    );
   };
 
   const shiftClock = (delta: number) =>
@@ -155,6 +161,23 @@ export function EditMatchSheet({ match: m, matches, teams, onClose, onOpenScoreb
             >
               Seguir chave
             </button>
+          </div>
+        )}
+
+        {m.status === "finished" && form.hs.trim() !== "" && form.hs === form.as && (
+          <div className="rounded-2xl border border-[var(--separator)] p-3">
+            <p className="mb-2 px-1 text-[13px] font-semibold text-muted">Placar empatado — resultado:</p>
+            <div className="grid gap-2">
+              {(m.phase === "group" ? (["draw", "home", "away"] as const) : (["home", "away"] as const)).map((o) => (
+                <button
+                  key={o}
+                  onClick={() => setOutcome(o)}
+                  className={`press min-h-11 rounded-full px-4 text-left text-[15px] font-semibold ${outcome === o ? "bg-accent text-white" : "glass"}`}
+                >
+                  {o === "draw" ? "Empate" : `Vitória ${teamName(o === "home" ? m.home_team_id : m.away_team_id)} (definida pelo juiz)`}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

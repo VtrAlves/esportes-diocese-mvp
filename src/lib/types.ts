@@ -8,6 +8,16 @@ export interface Team {
   group_code: GroupCode;
 }
 
+export type TiebreakCriterion = "saldo" | "pro" | "h2h" | "sorteio";
+
+export interface GroupTiebreak {
+  group_code: GroupCode;
+  manual_order: string[];
+  criterion: TiebreakCriterion;
+  results_key: string;
+  updated_at?: string;
+}
+
 export interface Match {
   id: string;
   phase: Phase;

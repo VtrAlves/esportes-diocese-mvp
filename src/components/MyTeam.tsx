@@ -2,13 +2,14 @@
 import { GROUPS } from "@/lib/rules";
 import { involves, sortByOrder, teamQueueInfo } from "@/lib/queue";
 import { computeOverall, computeStandings, isGroupComplete } from "@/lib/standings";
-import type { Match, Team } from "@/lib/types";
+import type { GroupTiebreak, Match, Team } from "@/lib/types";
 import { MatchRow } from "./MatchRow";
 import { Button, cx, GlassCard, SectionTitle } from "./ui";
 
 interface Props {
   teams: Team[];
   matches: Match[];
+  tiebreaks: GroupTiebreak[];
   myTeam: string | null;
   setMyTeam: (id: string | null) => void;
   teamName: (id: string | null, f?: string) => string;
@@ -51,10 +52,10 @@ export function QueueInfoCard({ matches, myTeam, teamName }: Pick<Props, "matche
 }
 
 /** Resumo do time: posição no grupo, campanha e saldo. */
-function TeamStats({ teams, matches, myTeam }: Pick<Props, "teams" | "matches" | "myTeam">) {
+function TeamStats({ teams, matches, tiebreaks, myTeam }: Pick<Props, "teams" | "matches" | "tiebreaks" | "myTeam">) {
   const team = teams.find((t) => t.id === myTeam);
   if (!team) return null;
-  const group = computeStandings(teams, matches, team.group_code);
+  const group = computeStandings(teams, matches, team.group_code, tiebreaks);
   const pos = group.findIndex((r) => r.team.id === team.id) + 1;
   const groupDone = isGroupComplete(matches, team.group_code);
   const overall = computeOverall(teams, matches);
@@ -64,7 +65,7 @@ function TeamStats({ teams, matches, myTeam }: Pick<Props, "teams" | "matches" |
   const stats = [
     { label: `Grupo ${team.group_code}`, value: `${pos}º`, hint: groupDone ? (pos <= 2 ? "classificado" : "eliminado") : "parcial" },
     { label: "Geral", value: me.played ? `${overallPos}º` : "—", hint: "de " + overall.length },
-    { label: "Campanha", value: `${me.wins}V ${me.losses}D`, hint: `${me.played} ${me.played === 1 ? "jogo" : "jogos"}` },
+    { label: "Campanha", value: me.draws ? `${me.wins}V ${me.draws}E ${me.losses}D` : `${me.wins}V ${me.losses}D`, hint: `${me.played} ${me.played === 1 ? "jogo" : "jogos"}` },
     { label: "Saldo", value: me.diff > 0 ? `+${me.diff}` : String(me.diff), hint: `${me.pointsFor} pró · ${me.pointsAgainst} contra` },
   ];
   return (
@@ -87,7 +88,7 @@ function TeamStats({ teams, matches, myTeam }: Pick<Props, "teams" | "matches" |
   );
 }
 
-export function MyTeam({ teams, matches, myTeam, setMyTeam, teamName }: Props) {
+export function MyTeam({ teams, matches, tiebreaks, myTeam, setMyTeam, teamName }: Props) {
   const mine = myTeam ? sortByOrder(matches).filter((m) => involves(m, myTeam)) : [];
   const played = mine.filter((m) => m.status === "finished");
   const pending = mine.filter((m) => m.status !== "finished");
@@ -95,7 +96,7 @@ export function MyTeam({ teams, matches, myTeam, setMyTeam, teamName }: Props) {
   return (
     <div className="space-y-4">
       <QueueInfoCard matches={matches} myTeam={myTeam} teamName={teamName} />
-      <TeamStats teams={teams} matches={matches} myTeam={myTeam} />
+      <TeamStats teams={teams} matches={matches} tiebreaks={tiebreaks} myTeam={myTeam} />
 
       {pending.length > 0 && (
         <>
