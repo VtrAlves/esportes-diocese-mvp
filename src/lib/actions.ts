@@ -1,0 +1,102 @@
+import { decidedWinnerSide } from "./rules";
+import { elapsedMs } from "./timer";
+import type { Match } from "./types";
+
+export type MatchAction =
+  | { type: "point"; side: "home" | "away"; delta: 1 | -1 }
+  | { type: "start" }
+  | { type: "pause" }
+  | { type: "timeup" }
+  | { type: "finish" }
+  | { type: "reopen" }
+  | { type: "reset" };
+
+export type MatchPatch = Partial<
+  Pick<
+    Match,
+    | "status"
+    | "home_score"
+    | "away_score"
+    | "elapsed_seconds"
+    | "timer_started_at"
+    | "golden_point"
+    | "winner_id"
+    | "finished_at"
+  >
+>;
+
+export class ActionError extends Error {}
+
+function stopTimer(m: Match, now: number): MatchPatch {
+  return {
+    elapsed_seconds: Math.min(m.duration_seconds, Math.round(elapsedMs(m, now) / 1000)),
+    timer_started_at: null,
+  };
+}
+
+/** Aplica uma ação do juiz e devolve as colunas a atualizar. Função pura. */
+export function applyAction(m: Match, action: MatchAction, now: number): MatchPatch {
+  const nowIso = new Date(now).toISOString();
+  switch (action.type) {
+    case "point": {
+      if (m.status === "finished") throw new ActionError("Partida já finalizada. Reabra para corrigir.");
+      const key = action.side === "home" ? "home_score" : "away_score";
+      const next = Math.max(0, m[key] + action.delta);
+      const patch: MatchPatch = { [key]: next };
+      const after = { ...m, ...patch };
+      // Partida decidida: para o cronômetro e aguarda confirmação do juiz.
+      if (decidedWinnerSide(after, false) && m.status === "live") {
+        Object.assign(patch, stopTimer(m, now), { status: "paused" });
+      }
+      return patch;
+    }
+    case "start": {
+      if (m.status === "finished") throw new ActionError("Partida já finalizada.");
+      if (!m.home_team_id || !m.away_team_id) throw new ActionError("Defina os dois times antes de iniciar.");
+      if (m.status === "live") return {};
+      if (m.elapsed_seconds >= m.duration_seconds) return { status: "paused" };
+      return { status: "live", timer_started_at: nowIso };
+    }
+    case "pause": {
+      if (m.status !== "live") return {};
+      return { status: "paused", ...stopTimer(m, now) };
+    }
+    case "timeup": {
+      if (m.status === "finished") return {};
+      return {
+        status: "paused",
+        elapsed_seconds: m.duration_seconds,
+        timer_started_at: null,
+        golden_point: m.home_score === m.away_score,
+      };
+    }
+    case "finish": {
+      if (m.status === "finished") return {};
+      if (m.home_score === m.away_score) throw new ActionError("Placar empatado: não há vencedor.");
+      const winner = m.home_score > m.away_score ? m.home_team_id : m.away_team_id;
+      return {
+        status: "finished",
+        winner_id: winner,
+        finished_at: nowIso,
+        golden_point: false,
+        ...(m.status === "live" ? stopTimer(m, now) : {}),
+      };
+    }
+    case "reopen": {
+      if (m.status !== "finished") return {};
+      return { status: "paused", winner_id: null, finished_at: null };
+    }
+    case "reset": {
+      return {
+        status: "scheduled",
+        home_score: 0,
+        away_score: 0,
+        elapsed_seconds: 0,
+        timer_started_at: null,
+        golden_point: false,
+        winner_id: null,
+        finished_at: null,
+      };
+    }
+  }
+}
