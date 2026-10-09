@@ -24,7 +24,7 @@ const TABS: TabItem<Tab>[] = [
 ];
 
 export function JudgeApp() {
-  const { teams, matches, loading, error, connected, refresh, patchMatch, setMatches } = useTournament();
+  const { teams, matches, loading, error, connected, refresh, mutateMatch, setMatches } = useTournament();
   const teamName = useTeamName(teams);
   const [tab, setTab] = useState<Tab>("score");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -105,8 +105,7 @@ export function JudgeApp() {
                 <ScoreControl
                   match={scoreMatch}
                   teamName={teamName}
-                  patchMatch={patchMatch}
-                  refresh={refresh}
+                  mutateMatch={mutateMatch}
                   onError={showError}
                   onInfo={showInfo}
                   onEdit={(m) => setEditingId(m.id)}

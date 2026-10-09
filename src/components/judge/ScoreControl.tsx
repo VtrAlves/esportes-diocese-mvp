@@ -12,8 +12,7 @@ import { beep, vibrate } from "./feedback";
 interface Props {
   match: Match;
   teamName: (id: string | null, f?: string) => string;
-  patchMatch: (id: string, patch: Partial<Match>) => void;
-  refresh: () => void;
+  mutateMatch: <T extends { match: Match }>(id: string, local: (m: Match) => Partial<Match>, request: () => Promise<T>) => Promise<T>;
   onError: (msg: string) => void;
   onInfo: (msg: string) => void;
   onEdit: (m: Match) => void;
@@ -21,7 +20,7 @@ interface Props {
 
 type Side = "home" | "away";
 
-export function ScoreControl({ match: m, teamName, patchMatch, refresh, onError, onInfo, onEdit }: Props) {
+export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo, onEdit }: Props) {
   const now = useServerNow(m.status === "live", 200);
   const remaining = remainingMs(m, now);
   const timeUp = remaining <= 0;
@@ -35,19 +34,31 @@ export function ScoreControl({ match: m, teamName, patchMatch, refresh, onError,
   }, [m.id]);
 
   const run = async (action: MatchAction) => {
-    try {
-      patchMatch(m.id, applyAction(m, action, now));
-    } catch (e) {
-      onError((e as Error).message);
-      return;
+    if (action.type !== "point") {
+      // Valida antes (ex.: encerrar com empate) para mostrar o erro sem tocar no estado.
+      try {
+        applyAction(m, action, now);
+      } catch (e) {
+        onError((e as Error).message);
+        return;
+      }
     }
     try {
-      const res = await judgeApi.action(m.id, action);
-      patchMatch(m.id, res.match);
+      const res = await mutateMatch(
+        m.id,
+        // Calculado sobre o estado mais recente: toques rápidos não se perdem.
+        (latest) => {
+          try {
+            return applyAction(latest, action, now);
+          } catch {
+            return {};
+          }
+        },
+        () => judgeApi.action(m.id, action),
+      );
       if (action.type === "finish") onInfo(res.notified ? `Partida encerrada. Aviso enviado para ${res.notified} aparelho(s).` : "Partida encerrada.");
     } catch (e) {
       onError((e as Error).message);
-      refresh();
     }
   };
 

@@ -21,6 +21,9 @@ export function useTournament() {
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const mounted = useRef(true);
+  // Partidas com ações do juiz ainda em envio: o estado local é a verdade até a fila esvaziar.
+  const pending = useRef(new Map<string, number>());
+  const isPending = (id: string) => (pending.current.get(id) ?? 0) > 0;
 
   const refresh = useCallback(async () => {
     const db = getBrowserClient();
@@ -33,7 +36,8 @@ export function useTournament() {
       setError((t.error ?? m.error)!.message);
     } else {
       setTeams(t.data as Team[]);
-      setMatches(m.data as Match[]);
+      const fresh = m.data as Match[];
+      setMatches((prev) => fresh.map((x) => (isPending(x.id) ? prev.find((p) => p.id === x.id) ?? x : x)));
       setError(null);
     }
     setLoading(false);
@@ -47,7 +51,7 @@ export function useTournament() {
       .channel("placar")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, (p) => {
         if (p.eventType === "DELETE") setMatches((l) => l.filter((x) => x.id !== (p.old as Row).id));
-        else setMatches((l) => upsert(l, p.new as Match));
+        else if (!isPending((p.new as Row).id)) setMatches((l) => upsert(l, p.new as Match));
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, (p) => {
         if (p.eventType === "DELETE") setTeams((l) => l.filter((x) => x.id !== (p.old as Row).id));
@@ -79,10 +83,32 @@ export function useTournament() {
     return () => clearInterval(id);
   }, [connected, refresh]);
 
-  /** Atualização otimista local (o realtime confirma em seguida). */
-  const patchMatch = useCallback((id: string, patch: Partial<Match>) => {
-    setMatches((l) => l.map((m) => (m.id === id ? { ...m, ...patch } : m)));
-  }, []);
+  /**
+   * Aplica uma mudança local imediatamente (a partir do estado mais recente, para toques rápidos)
+   * e envia ao servidor. Respostas e eventos intermediários são ignorados; quando a última
+   * requisição da partida termina, o estado do servidor passa a valer.
+   */
+  const mutateMatch = useCallback(
+    async <T extends { match: Match }>(id: string, local: (m: Match) => Partial<Match>, request: () => Promise<T>): Promise<T> => {
+      pending.current.set(id, (pending.current.get(id) ?? 0) + 1);
+      setMatches((l) => l.map((m) => (m.id === id ? { ...m, ...local(m) } : m)));
+      const done = () => {
+        const left = (pending.current.get(id) ?? 1) - 1;
+        if (left > 0) pending.current.set(id, left);
+        else pending.current.delete(id);
+        return left === 0;
+      };
+      try {
+        const res = await request();
+        if (done()) setMatches((l) => upsert(l, res.match));
+        return res;
+      } catch (e) {
+        if (done()) refresh();
+        throw e;
+      }
+    },
+    [refresh],
+  );
 
-  return { teams, matches, loading, error, connected, refresh, patchMatch, setMatches };
+  return { teams, matches, loading, error, connected, refresh, mutateMatch, setMatches };
 }
