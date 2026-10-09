@@ -12,6 +12,7 @@ import { beep, vibrate } from "./feedback";
 interface Props {
   match: Match;
   teamName: (id: string | null, f?: string) => string;
+  teamRecord: (id: string | null) => string | null;
   mutateMatch: <T extends { match: Match }>(id: string, local: (m: Match) => Partial<Match>, request: () => Promise<T>) => Promise<T>;
   onError: (msg: string) => void;
   onInfo: (msg: string) => void;
@@ -20,7 +21,7 @@ interface Props {
 
 type Side = "home" | "away";
 
-export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo, onEdit }: Props) {
+export function ScoreControl({ match: m, teamName, teamRecord, mutateMatch, onError, onInfo, onEdit }: Props) {
   const now = useServerNow(m.status === "live", 200);
   const remaining = remainingMs(m, now);
   const timeUp = remaining <= 0;
@@ -142,8 +143,11 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
             WebkitBackdropFilter: "blur(20px) saturate(180%)",
           }}
         >
-          <span className="line-clamp-2 px-2 text-center text-[17px] font-semibold text-white drop-shadow sm:text-[22px]">
-            {teamName(id, sourceLabel(src))}
+          <span className="flex flex-col items-center">
+            <span className="line-clamp-2 px-2 text-center text-[17px] font-semibold text-white drop-shadow sm:text-[22px]">
+              {teamName(id, sourceLabel(src))}
+            </span>
+            {teamRecord(id) && <span className="tabular text-[13px] font-semibold text-white/80 sm:text-[15px]">({teamRecord(id)})</span>}
           </span>
           <span key={score} className="score-pop tabular text-[clamp(96px,30vw,220px)] font-bold leading-none text-white drop-shadow-lg">
             {score}

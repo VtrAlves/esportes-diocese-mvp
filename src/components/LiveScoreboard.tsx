@@ -20,7 +20,19 @@ function Score({ value, color }: { value: number; color: string }) {
 }
 
 /** Placar grande somente leitura (tela dos jogadores). */
-export function LiveScoreboard({ match: m, teamName }: { match: Match; teamName: (id: string | null, f?: string) => string }) {
+export function LiveScoreboard({
+  match: m,
+  teamName,
+  teamRecord,
+}: {
+  match: Match;
+  teamName: (id: string | null, f?: string) => string;
+  teamRecord?: (id: string | null) => string | null;
+}) {
+  const record = (id: string | null) => {
+    const r = teamRecord?.(id);
+    return r ? <p className="tabular text-[13px] font-medium text-muted sm:text-[15px]">({r})</p> : null;
+  };
   return (
     <GlassCard strong className="enter p-5 sm:p-8">
       <div className="mb-4 flex items-center justify-between">
@@ -30,12 +42,16 @@ export function LiveScoreboard({ match: m, teamName }: { match: Match; teamName:
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
         <div className="min-w-0">
           <Score value={m.home_score} color="var(--home)" />
-          <p className="mt-2 line-clamp-2 text-[15px] font-semibold sm:text-[19px]">{teamName(m.home_team_id, sourceLabel(m.home_source))}</p>
+          <p className="mt-2 line-clamp-2 text-[15px] font-semibold sm:text-[19px]">{teamName(m.home_team_id, sourceLabel(m.home_source))}
+          </p>
+          {record(m.home_team_id)}
         </div>
         <span className="text-[28px] font-light text-muted">×</span>
         <div className="min-w-0">
           <Score value={m.away_score} color="var(--away)" />
-          <p className="mt-2 line-clamp-2 text-[15px] font-semibold sm:text-[19px]">{teamName(m.away_team_id, sourceLabel(m.away_source))}</p>
+          <p className="mt-2 line-clamp-2 text-[15px] font-semibold sm:text-[19px]">{teamName(m.away_team_id, sourceLabel(m.away_source))}
+          </p>
+          {record(m.away_team_id)}
         </div>
       </div>
       <div className="mt-6 flex items-center justify-center gap-6 text-center">

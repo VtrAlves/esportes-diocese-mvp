@@ -9,7 +9,7 @@ import { MatchRow } from "./MatchRow";
 import { MyTeam, QueueInfoCard } from "./MyTeam";
 import { TablesView } from "./StandingsTable";
 import { GlassCard, Icons, SectionTitle, TabBar, Toast, type TabItem } from "./ui";
-import { useTeamName } from "./useTeamName";
+import { useTeamName, useTeamRecord } from "./useTeamName";
 
 type Tab = "live" | "games" | "table" | "bracket" | "team";
 
@@ -24,6 +24,7 @@ const TABS: TabItem<Tab>[] = [
 export function PlayerApp() {
   const { teams, matches, tiebreaks, loading, error, connected } = useTournament();
   const teamName = useTeamName(teams);
+  const teamRecord = useTeamRecord(teams, matches);
   const [tab, setTab] = useState<Tab>("live");
   const [myTeam, setMyTeamState] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -94,7 +95,7 @@ export function PlayerApp() {
           {tab === "live" && (
             <div className="space-y-4">
               {current ? (
-                <LiveScoreboard match={current} teamName={teamName} />
+                <LiveScoreboard match={current} teamName={teamName} teamRecord={teamRecord} />
               ) : (
                 <GlassCard className="p-8 text-center">
                   <p className="text-[17px] font-semibold">Nenhuma partida em andamento</p>

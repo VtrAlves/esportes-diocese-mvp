@@ -7,7 +7,7 @@ import type { Match } from "@/lib/types";
 import { Bracket } from "../Bracket";
 import { TablesView } from "../StandingsTable";
 import { Button, GlassCard, Icons, TabBar, Toast, type TabItem } from "../ui";
-import { useTeamName } from "../useTeamName";
+import { useTeamName, useTeamRecord } from "../useTeamName";
 import { EditMatchSheet } from "./EditMatchSheet";
 import { JudgeQueue } from "./JudgeQueue";
 import { ScoreControl } from "./ScoreControl";
@@ -27,6 +27,7 @@ const TABS: TabItem<Tab>[] = [
 export function JudgeApp() {
   const { teams, matches, tiebreaks, loading, error, connected, refresh, mutateMatch, setMatches } = useTournament();
   const teamName = useTeamName(teams);
+  const teamRecord = useTeamRecord(teams, matches);
   const [tab, setTab] = useState<Tab>("score");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export function JudgeApp() {
                 <ScoreControl
                   match={scoreMatch}
                   teamName={teamName}
+                  teamRecord={teamRecord}
                   mutateMatch={mutateMatch}
                   onError={showError}
                   onInfo={showInfo}
