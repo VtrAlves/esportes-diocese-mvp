@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeStandings, isGroupComplete } from "./standings";
+import { computeOverall, computeStandings, isGroupComplete } from "./standings";
 import { match, result, team } from "./fixtures.test-utils";
 
 const teams = [team("x", "A"), team("y", "A"), team("z", "A")];
@@ -32,5 +32,24 @@ describe("computeStandings", () => {
     const ms = [result("A1", "A", "x", "y", 10, 5), match({ slot: "A2", group_code: "A", home_team_id: "x", away_team_id: "z", home_score: 3, status: "live" })];
     expect(computeStandings(teams, ms, "A")[0].played).toBe(1);
     expect(isGroupComplete(ms, "A")).toBe(false);
+  });
+});
+
+describe("computeOverall", () => {
+  it("soma grupos e mata-mata para todos os times", () => {
+    const all = [...teams, team("d", "D")];
+    const ms = [
+      result("A1", "A", "x", "y", 10, 5),
+      result("A2", "A", "x", "z", 10, 8),
+      match({ slot: "QF1", phase: "qf", home_team_id: "x", away_team_id: "d", home_score: 9, away_score: 12, status: "finished", winner_id: "d" }),
+      match({ slot: "A3", group_code: "A", home_team_id: "y", away_team_id: "z", home_score: 4, status: "live" }),
+    ];
+    const rows = computeOverall(all, ms);
+    const x = rows.find((r) => r.team.id === "x")!;
+    expect(x).toMatchObject({ played: 3, wins: 2, losses: 1, pointsFor: 29, pointsAgainst: 25, diff: 4 });
+    expect(x.winRate).toBeCloseTo(2 / 3);
+    expect(rows[0].team.id).toBe("x");
+    expect(rows.find((r) => r.team.id === "y")).toMatchObject({ played: 1, pointsFor: 5 });
+    expect(rows).toHaveLength(4);
   });
 });

@@ -5,7 +5,7 @@ import { judgeApi } from "@/lib/judgeApi";
 import { currentMatch, upcomingMatches } from "@/lib/queue";
 import type { Match } from "@/lib/types";
 import { Bracket } from "../Bracket";
-import { StandingsGrid } from "../StandingsTable";
+import { TablesView } from "../StandingsTable";
 import { Button, GlassCard, Icons, TabBar, Toast, type TabItem } from "../ui";
 import { useTeamName } from "../useTeamName";
 import { EditMatchSheet } from "./EditMatchSheet";
@@ -57,15 +57,6 @@ export function JudgeApp() {
     setSelectedId(next?.id ?? null);
   };
 
-  const notifyNext = async () => {
-    try {
-      const { sent } = await judgeApi.notify();
-      showInfo(sent ? `Aviso enviado para ${sent} aparelho(s).` : "Nenhum aparelho inscrito nos próximos times.");
-    } catch (e) {
-      showError((e as Error).message);
-    }
-  };
-
   const logout = async () => {
     await judgeApi.logout().catch(() => undefined);
     window.location.href = "/juiz/login";
@@ -84,10 +75,6 @@ export function JudgeApp() {
             {connected ? "Tempo real conectado" : "Reconectando…"}
           </p>
         </div>
-        <Button onClick={notifyNext} className="px-4 text-[14px]">
-          <span className="size-5">{Icons.bell}</span>
-          <span className="hidden sm:inline">Notificar próximos</span>
-        </Button>
         <button onClick={logout} aria-label="Sair" className="press glass size-11 rounded-full p-2.5 text-muted">
           {Icons.logout}
         </button>
@@ -141,7 +128,7 @@ export function JudgeApp() {
           {tab === "bracket" && (
             <div className="space-y-6">
               <Bracket matches={matches} teamName={teamName} onSelect={(m) => setEditingId(m.id)} />
-              <StandingsGrid teams={teams} matches={matches} />
+              <TablesView teams={teams} matches={matches} />
             </div>
           )}
 

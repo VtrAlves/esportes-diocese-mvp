@@ -159,15 +159,6 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
         </Button>
         <div className="grid grid-cols-2 gap-2">
           <Button onClick={() => { onOpenScoreboard(m); onClose(); }}>Abrir no placar</Button>
-          <Button
-            disabled={busy || !m.home_team_id}
-            onClick={() => wrap(async () => {
-              const r = await judgeApi.notify(m.id);
-              return r;
-            }, "Times chamados para a quadra.", false)}
-          >
-            Chamar times
-          </Button>
           {m.status === "finished" && (
             <Button disabled={busy} onClick={() => wrap(() => judgeApi.action(m.id, { type: "reopen" }), "Partida reaberta.")}>
               Reabrir

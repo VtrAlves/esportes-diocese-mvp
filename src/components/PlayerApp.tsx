@@ -1,14 +1,13 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTournament } from "@/hooks/useTournament";
-import { localNotify, registerSW } from "@/lib/pushClient";
 import { currentMatch, sortByOrder, teamQueueInfo, upcomingMatches } from "@/lib/queue";
 import { readLocal, writeLocal } from "@/lib/storage";
 import { Bracket } from "./Bracket";
 import { LiveScoreboard } from "./LiveScoreboard";
 import { MatchRow } from "./MatchRow";
 import { MyTeam, QueueInfoCard } from "./MyTeam";
-import { StandingsGrid, StandingsSummary } from "./StandingsTable";
+import { TablesView } from "./StandingsTable";
 import { GlassCard, Icons, SectionTitle, TabBar, Toast, type TabItem } from "./ui";
 import { useTeamName } from "./useTeamName";
 
@@ -34,7 +33,8 @@ export function PlayerApp() {
     setMyTeamState(readLocal("meuTime"));
     const savedTab = readLocal("aba") as Tab | null;
     if (savedTab && TABS.some((t) => t.id === savedTab)) setTab(savedTab);
-    registerSW();
+    // Desinstala o service worker de notificações de versões anteriores.
+    navigator.serviceWorker?.getRegistrations().then((regs) => regs.forEach((r) => r.update().catch(() => undefined)));
   }, []);
 
   const setMyTeam = (id: string | null) => {
@@ -60,7 +60,6 @@ export function PlayerApp() {
     const message = info.gamesBefore === 0 ? "🏐 Vocês são os próximos! Preparem-se." : "⏳ Falta 1 jogo para o seu time.";
     setToast(message);
     navigator.vibrate?.([200, 100, 200]);
-    if (document.visibilityState !== "visible") localNotify("Placar Vôlei", message);
   }, [matches, myTeam, loading]);
 
   const current = currentMatch(matches);
@@ -115,7 +114,7 @@ export function PlayerApp() {
               )}
               {!myTeam && (
                 <button onClick={() => changeTab("team")} className="press glass specular w-full rounded-[22px] p-4 text-left text-[15px]">
-                  <b>Escolha seu time</b> <span className="text-muted">para saber quantos jogos faltam e receber avisos →</span>
+                  <b>Escolha seu time</b> <span className="text-muted">para acompanhar os jogos e saber quantos faltam →</span>
                 </button>
               )}
             </div>
@@ -151,12 +150,7 @@ export function PlayerApp() {
             </div>
           )}
 
-          {tab === "table" && (
-            <div className="space-y-4">
-              <StandingsGrid teams={teams} matches={matches} highlightTeam={myTeam} />
-              <StandingsSummary teams={teams} matches={matches} />
-            </div>
-          )}
+          {tab === "table" && <TablesView teams={teams} matches={matches} highlightTeam={myTeam} />}
 
           {tab === "bracket" && <Bracket matches={matches} teamName={teamName} highlightTeam={myTeam} />}
 

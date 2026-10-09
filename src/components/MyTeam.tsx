@@ -1,11 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
 import { GROUPS } from "@/lib/rules";
-import { currentSubscription, isIOS, isStandalone, notificationPermission, pushSupported, subscribeTeam, unsubscribe } from "@/lib/pushClient";
-import { teamQueueInfo } from "@/lib/queue";
+import { involves, sortByOrder, teamQueueInfo } from "@/lib/queue";
+import { computeOverall, computeStandings, isGroupComplete } from "@/lib/standings";
 import type { Match, Team } from "@/lib/types";
 import { MatchRow } from "./MatchRow";
-import { Button, cx, GlassCard, Icons, SectionTitle } from "./ui";
+import { Button, cx, GlassCard, SectionTitle } from "./ui";
 
 interface Props {
   teams: Team[];
@@ -51,93 +50,72 @@ export function QueueInfoCard({ matches, myTeam, teamName }: Pick<Props, "matche
   );
 }
 
+/** Resumo do time: posição no grupo, campanha e saldo. */
+function TeamStats({ teams, matches, myTeam }: Pick<Props, "teams" | "matches" | "myTeam">) {
+  const team = teams.find((t) => t.id === myTeam);
+  if (!team) return null;
+  const group = computeStandings(teams, matches, team.group_code);
+  const pos = group.findIndex((r) => r.team.id === team.id) + 1;
+  const groupDone = isGroupComplete(matches, team.group_code);
+  const overall = computeOverall(teams, matches);
+  const me = overall.find((r) => r.team.id === team.id);
+  const overallPos = overall.findIndex((r) => r.team.id === team.id) + 1;
+  if (!me) return null;
+  const stats = [
+    { label: `Grupo ${team.group_code}`, value: `${pos}º`, hint: groupDone ? (pos <= 2 ? "classificado" : "eliminado") : "parcial" },
+    { label: "Geral", value: me.played ? `${overallPos}º` : "—", hint: "de " + overall.length },
+    { label: "Campanha", value: `${me.wins}V ${me.losses}D`, hint: `${me.played} ${me.played === 1 ? "jogo" : "jogos"}` },
+    { label: "Saldo", value: me.diff > 0 ? `+${me.diff}` : String(me.diff), hint: `${me.pointsFor} pró · ${me.pointsAgainst} contra` },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {stats.map((s) => (
+        <GlassCard key={s.label} className="p-4">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-muted">{s.label}</p>
+          <p
+            className={cx(
+              "tabular mt-0.5 text-[26px] font-bold leading-tight",
+              s.label === "Saldo" && (me.diff > 0 ? "text-success" : me.diff < 0 ? "text-danger" : ""),
+            )}
+          >
+            {s.value}
+          </p>
+          <p className="text-[12px] text-muted">{s.hint}</p>
+        </GlassCard>
+      ))}
+    </div>
+  );
+}
+
 export function MyTeam({ teams, matches, myTeam, setMyTeam, teamName }: Props) {
-  const [pushOn, setPushOn] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [env, setEnv] = useState({ supported: true, ios: false, standalone: false });
-
-  useEffect(() => {
-    setEnv({ supported: pushSupported(), ios: isIOS(), standalone: isStandalone() });
-    currentSubscription().then((s) => setPushOn(!!s));
-  }, []);
-
-  const needsInstall = env.ios && !env.standalone;
-
-  const choose = async (id: string) => {
-    setMyTeam(id);
-    // Escolher o time já pede a permissão de notificação (o toque do usuário permite o pedido).
-    const canAsk = env.supported && !needsInstall && notificationPermission() !== "denied";
-    if (!pushOn && !canAsk) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await subscribeTeam(id);
-      if (!pushOn) setMsg("Pronto! Você será avisado quando for a vez do seu time.");
-      setPushOn(true);
-    } catch (e) {
-      setMsg((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const togglePush = async () => {
-    if (!myTeam) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      if (pushOn) {
-        await unsubscribe();
-        setPushOn(false);
-      } else {
-        await subscribeTeam(myTeam);
-        setPushOn(true);
-        setMsg("Pronto! Você será avisado quando for a vez do seu time.");
-      }
-    } catch (e) {
-      setMsg((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const mine = myTeam ? sortByOrder(matches).filter((m) => involves(m, myTeam)) : [];
+  const played = mine.filter((m) => m.status === "finished");
+  const pending = mine.filter((m) => m.status !== "finished");
 
   return (
     <div className="space-y-4">
       <QueueInfoCard matches={matches} myTeam={myTeam} teamName={teamName} />
+      <TeamStats teams={teams} matches={matches} myTeam={myTeam} />
 
-      {myTeam && (
-        <GlassCard className="p-5">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 size-7 shrink-0 text-accent">{Icons.bell}</span>
-            <div className="flex-1">
-              <p className="text-[17px] font-semibold">Notificações</p>
-              <p className="text-[14px] text-muted">Aviso quando faltar 1 jogo e quando seu time for o próximo.</p>
-            </div>
-          </div>
-          {needsInstall ? (
-            <div className="mt-4 rounded-2xl bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] p-4 text-[14px]">
-              <p className="font-semibold">No iPhone/iPad:</p>
-              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-muted">
-                <li>Toque em <b>Compartilhar</b> no Safari</li>
-                <li>Escolha <b>Adicionar à Tela de Início</b></li>
-                <li>Abra o app pela tela inicial e ative aqui</li>
-              </ol>
-            </div>
-          ) : !env.supported ? (
-            <p className="mt-4 text-[14px] text-muted">Este navegador não suporta notificações push. Mantenha esta tela aberta para ver os avisos.</p>
-          ) : (
-            <Button variant={pushOn ? "glass" : "primary"} className="mt-4 w-full" onClick={togglePush} disabled={busy}>
-              {busy ? "Aguarde…" : pushOn ? "Desativar notificações" : "Ativar notificações"}
-            </Button>
-          )}
-          {msg && <p className="mt-3 text-center text-[13px] text-muted">{msg}</p>}
-          {!pushOn && env.supported && !needsInstall && notificationPermission() === "denied" && (
-            <p className="mt-3 text-center text-[13px] text-muted">
-              As notificações foram bloqueadas neste navegador. Toque no 🔒 ao lado do endereço → Notificações → Permitir, e depois em Ativar.
-            </p>
-          )}
-        </GlassCard>
+      {pending.length > 0 && (
+        <>
+          <SectionTitle>Próximos jogos do time</SectionTitle>
+          <GlassCard className="divide-y divide-[var(--separator)] overflow-hidden">
+            {pending.map((m) => (
+              <MatchRow key={m.id} match={m} teamName={teamName} highlightTeam={myTeam} />
+            ))}
+          </GlassCard>
+        </>
+      )}
+      {played.length > 0 && (
+        <>
+          <SectionTitle>Resultados do time</SectionTitle>
+          <GlassCard className="divide-y divide-[var(--separator)] overflow-hidden">
+            {played.map((m) => (
+              <MatchRow key={m.id} match={m} teamName={teamName} highlightTeam={myTeam} />
+            ))}
+          </GlassCard>
+        </>
       )}
 
       <SectionTitle>{myTeam ? "Trocar de time" : "Escolha o seu time"}</SectionTitle>
@@ -152,7 +130,7 @@ export function MyTeam({ teams, matches, myTeam, setMyTeam, teamName }: Props) {
                 return (
                   <button
                     key={t.id}
-                    onClick={() => choose(t.id)}
+                    onClick={() => setMyTeam(t.id)}
                     className={cx(
                       "press flex min-h-12 w-full items-center justify-between rounded-2xl px-3 text-left text-[16px] font-medium",
                       active && "bg-accent text-white",

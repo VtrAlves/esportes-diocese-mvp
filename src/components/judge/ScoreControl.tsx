@@ -44,7 +44,7 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
       }
     }
     try {
-      const res = await mutateMatch(
+      await mutateMatch(
         m.id,
         // Calculado sobre o estado mais recente: toques rápidos não se perdem.
         (latest) => {
@@ -56,7 +56,7 @@ export function ScoreControl({ match: m, teamName, mutateMatch, onError, onInfo,
         },
         () => judgeApi.action(m.id, action),
       );
-      if (action.type === "finish") onInfo(res.notified ? `Partida encerrada. Aviso enviado para ${res.notified} aparelho(s).` : "Partida encerrada.");
+      if (action.type === "finish") onInfo("Partida encerrada.");
     } catch (e) {
       onError((e as Error).message);
     }

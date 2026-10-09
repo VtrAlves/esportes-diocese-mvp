@@ -1,6 +1,5 @@
 import { ActionError, applyAction, type MatchAction } from "@/lib/actions";
 import { judgeRoute } from "@/lib/api";
-import { notifyUpcoming } from "@/lib/push";
 import { getAdminClient } from "@/lib/supabase/server";
 import { syncBracket } from "@/lib/sync";
 import type { Match } from "@/lib/types";
@@ -30,13 +29,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
     const wasFinished = current.status === "finished";
     const changedResult = action.type === "finish" || ((action.type === "reopen" || action.type === "reset") && wasFinished);
-    let notified = 0;
-    if (changedResult) {
-      const data = await syncBracket(db);
-      if (action.type === "finish" && !wasFinished) {
-        notified = await notifyUpcoming(db, data.teams, data.matches);
-      }
-    }
-    return { match, notified };
+    if (changedResult) await syncBracket(db);
+    return { match };
   });
 }

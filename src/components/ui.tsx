@@ -63,6 +63,27 @@ export function StatusBadge({ status, golden }: { status: string; golden?: boole
   return null;
 }
 
+/** Controle segmentado em vidro, estilo iOS. */
+export function Segmented<T extends string>({ options, value, onChange }: { options: { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <div className="glass specular flex rounded-full p-1">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => onChange(o.id)}
+          aria-pressed={o.id === value}
+          className={cx(
+            "press min-h-10 flex-1 rounded-full px-4 text-[14px] font-semibold",
+            o.id === value ? "bg-accent text-white shadow-[inset_0_1px_0_rgba(255,255,255,.35)]" : "text-muted",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export interface TabItem<T extends string> {
   id: T;
   label: string;

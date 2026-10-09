@@ -28,12 +28,11 @@ async function call<T>(url: string, method: string, body?: unknown): Promise<T> 
 
 export const judgeApi = {
   action: (id: string, action: MatchAction) =>
-    enqueue(() => call<{ match: Match; notified: number }>(`/api/matches/${id}/action`, "POST", action)),
+    enqueue(() => call<{ match: Match }>(`/api/matches/${id}/action`, "POST", action)),
   update: (id: string, patch: Partial<Match> & { remaining_seconds?: number }) =>
     enqueue(() => call<{ match: Match }>(`/api/matches/${id}`, "PATCH", patch)),
   reorder: (ids: string[]) => enqueue(() => call(`/api/matches/reorder`, "POST", { ids })),
   renameTeam: (id: string, name: string) => enqueue(() => call(`/api/teams/${id}`, "PATCH", { name })),
   resetTournament: (restoreDefaults: boolean) => enqueue(() => call(`/api/tournament/reset`, "POST", { restoreDefaults })),
-  notify: (matchId?: string) => call<{ sent: number }>(`/api/notify`, "POST", { matchId }),
   logout: () => call(`/api/juiz/logout`, "POST"),
 };

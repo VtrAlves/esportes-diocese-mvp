@@ -1,36 +1,12 @@
-// Service worker: recebe Web Push e abre o app ao tocar na notificação.
+// As notificações foram removidas. Este service worker apenas se desinstala
+// dos aparelhos que ativaram notificações em versões anteriores.
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
-
-self.addEventListener("push", (event) => {
-  let data = { title: "Placar Vôlei", body: "" };
-  try {
-    data = event.data ? event.data.json() : data;
-  } catch {
-    data.body = event.data ? event.data.text() : "";
-  }
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      tag: data.tag,
-      renotify: true,
-      icon: "/icons/192",
-      badge: "/icons/192",
-      vibrate: [200, 100, 200, 100, 400],
-      data: { url: data.url || "/" },
-    }),
-  );
-});
-
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/";
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if ("focus" in client) return client.focus();
-      }
-      return self.clients.openWindow(url);
-    }),
+    (async () => {
+      const subscription = await self.registration.pushManager.getSubscription();
+      if (subscription) await subscription.unsubscribe();
+      await self.registration.unregister();
+    })(),
   );
 });
