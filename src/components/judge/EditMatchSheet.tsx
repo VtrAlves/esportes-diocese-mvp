@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { judgeApi } from "@/lib/judgeApi";
 import { defaultRules, GROUPS, matchLabel, sourceLabel } from "@/lib/rules";
+import { formatClock, remainingMs } from "@/lib/timer";
 import type { Match, Team } from "@/lib/types";
 import { Button, Field, inputClass, Sheet } from "../ui";
 
@@ -16,7 +17,8 @@ interface Props {
 }
 
 export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onDone, onError, refresh }: Props) {
-  const [form, setForm] = useState({ target: "", minutes: "", home: "", away: "", hs: "", as: "" });
+  const [form, setForm] = useState({ target: "", minutes: "", home: "", away: "", hs: "", as: "", clock: "" });
+  const [initialClock, setInitialClock] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -28,7 +30,9 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
       away: m.away_team_id ?? "",
       hs: String(m.home_score),
       as: String(m.away_score),
+      clock: formatClock(remainingMs(m, Date.now())),
     });
+    setInitialClock(formatClock(remainingMs(m, Date.now())));
     // Só reinicia o formulário ao abrir outra partida (não a cada atualização em tempo real).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m?.id]);
@@ -58,12 +62,23 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
     };
     if (form.home !== (m.home_team_id ?? "")) patch.home_team_id = form.home || null;
     if (form.away !== (m.away_team_id ?? "")) patch.away_team_id = form.away || null;
-    if (m.status !== "scheduled") {
-      patch.home_score = Number(form.hs);
-      patch.away_score = Number(form.as);
+    patch.home_score = Number(form.hs);
+    patch.away_score = Number(form.as);
+    let remaining: number | undefined;
+    if (form.clock !== initialClock) {
+      const secs = parseClock(form.clock);
+      if (secs === null) return onError("Tempo restante inválido. Use o formato mm:ss, ex.: 05:30.");
+      remaining = secs;
     }
-    wrap(() => judgeApi.update(m.id, patch), "Partida atualizada.");
+    wrap(() => judgeApi.update(m.id, { ...patch, ...(remaining !== undefined ? { remaining_seconds: remaining } : {}) }), "Partida atualizada.");
   };
+
+  const shiftClock = (delta: number) =>
+    setForm((f) => {
+      const total = Math.round(Number(f.minutes.replace(",", ".")) * 60) || m.duration_seconds;
+      const cur = parseClock(f.clock) ?? 0;
+      return { ...f, clock: formatClock(Math.min(total, Math.max(0, cur + delta)) * 1000) };
+    });
 
   const defaults = defaultRules(m.phase, m.group_code);
   const teamOptions = (
@@ -90,7 +105,7 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
           <Field label="Pontos para vencer">
             <input inputMode="numeric" className={inputClass} value={form.target} onChange={set("target")} />
           </Field>
-          <Field label="Tempo (minutos)">
+          <Field label="Tempo total (min)">
             <input inputMode="decimal" className={inputClass} value={form.minutes} onChange={set("minutes")} />
           </Field>
         </div>
@@ -101,23 +116,30 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
           Usar padrão da fase ({defaults.target_points} pts · {defaults.duration_seconds / 60} min)
         </button>
 
+        <Field label={m.status === "live" ? "Tempo restante (cronômetro rodando)" : "Tempo restante"}>
+          <input inputMode="numeric" className={inputClass + " tabular text-center text-[22px] font-semibold"} value={form.clock} onChange={set("clock")} placeholder="mm:ss" />
+        </Field>
+        <div className="grid grid-cols-4 gap-2">
+          {[-60, -10, 10, 60].map((d) => (
+            <Button key={d} className="px-2 text-[14px]" onClick={() => shiftClock(d)}>
+              {d > 0 ? "+" : "−"}{Math.abs(d) >= 60 ? `${Math.abs(d) / 60} min` : `${Math.abs(d)} s`}
+            </Button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-[1fr_auto] items-end gap-3">
           <Field label={`Time 1${m.home_source ? ` · ${sourceLabel(m.home_source)}` : ""}`}>
             <select className={inputClass} value={form.home} onChange={set("home")}>{teamOptions}</select>
           </Field>
-          {m.status !== "scheduled" && (
-            <Field label="Placar">
-              <input inputMode="numeric" className={inputClass + " w-20 text-center"} value={form.hs} onChange={set("hs")} />
-            </Field>
-          )}
+          <Field label="Placar">
+            <input inputMode="numeric" className={inputClass + " w-20 text-center"} value={form.hs} onChange={set("hs")} />
+          </Field>
           <Field label={`Time 2${m.away_source ? ` · ${sourceLabel(m.away_source)}` : ""}`}>
             <select className={inputClass} value={form.away} onChange={set("away")}>{teamOptions}</select>
           </Field>
-          {m.status !== "scheduled" && (
-            <Field label="Placar">
-              <input inputMode="numeric" className={inputClass + " w-20 text-center"} value={form.as} onChange={set("as")} />
-            </Field>
-          )}
+          <Field label="Placar">
+            <input inputMode="numeric" className={inputClass + " w-20 text-center"} value={form.as} onChange={set("as")} />
+          </Field>
         </div>
         {m.phase !== "group" && m.teams_locked && (
           <div className="flex items-center justify-between gap-3 rounded-2xl bg-[color-mix(in_srgb,var(--gold)_15%,transparent)] p-3 text-[13px]">
@@ -167,4 +189,13 @@ export function EditMatchSheet({ match: m, teams, onClose, onOpenScoreboard, onD
       </div>
     </Sheet>
   );
+}
+
+/** "5:30" → 330 s; "5" → 300 s. */
+function parseClock(v: string): number | null {
+  const t = v.trim().replace(",", ".");
+  const mmss = t.match(/^(\d{1,3}):([0-5]?\d)$/);
+  if (mmss) return Number(mmss[1]) * 60 + Number(mmss[2]);
+  if (/^\d+(\.\d+)?$/.test(t)) return Math.round(Number(t) * 60);
+  return null;
 }

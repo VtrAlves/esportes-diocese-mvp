@@ -145,7 +145,7 @@ export function JudgeApp() {
             </div>
           )}
 
-          {tab === "teams" && <TeamsEditor teams={teams} onError={showError} onDone={showInfo} />}
+          {tab === "teams" && <TeamsEditor teams={teams} onError={showError} onDone={showInfo} refresh={refresh} />}
         </main>
       )}
 

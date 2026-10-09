@@ -2,6 +2,12 @@ import type { GroupCode, Match, Phase } from "./types";
 
 export const GROUPS: GroupCode[] = ["A", "B", "C", "D"];
 
+/** Ordem padrão dos jogos (intercalada para dar descanso aos times). */
+export const DEFAULT_ORDER = [
+  "A1", "B1", "C1", "D1", "A2", "B2", "C2", "A3", "B3", "C3",
+  "QF1", "QF2", "QF3", "QF4", "SF1", "SF2", "THIRD", "FINAL",
+];
+
 export function defaultRules(phase: Phase, group?: GroupCode | null) {
   switch (phase) {
     case "group":
